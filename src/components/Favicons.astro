@@ -1,0 +1,15 @@
+---
+import faviconSvg from '~/assets/favicons/favicon.svg';
+---
+
+<!-- Standard favicon -->
+<link rel="icon" type="image/svg+xml" href={faviconSvg.src} />
+
+<!-- Legacy shortcut icon (some browsers still look for this) -->
+<link rel="shortcut icon" href={faviconSvg.src} />
+
+<!-- Safari mask‑icon (monochrome, tinted by `color`) -->
+<link rel="mask-icon" href={faviconSvg.src} color="#8D46E7" />
+
+<!-- Apple touch (you can use the same SVG, or generate a 180×180 PNG if you like) -->
+<link rel="apple-touch-icon" sizes="180x180" href={faviconSvg.src} />

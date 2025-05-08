@@ -1,0 +1,68 @@
+---
+import WidgetWrapper from '~/components/ui/WidgetWrapper.astro';
+import Headline from '~/components/ui/Headline.astro';
+import ContactForm from '~/components/ContactForm.astro';
+
+interface InputField {
+  label: string;
+  name: string;
+  type: string;
+  placeholder?: string;
+  value?: string;
+  required?: boolean;
+  // Add more fields as needed
+}
+
+interface Props {
+  id?: string;
+  title?: string | { label: string };
+  subtitle?: string | { label: string };
+  tagline?: string | { label: string };
+  footer?: string;
+  description?: string;
+  disclaimer?: string;
+  senderEmail?: string;
+  recipient: string;
+  inputs?: InputField[];
+}
+
+const props = Astro.props as Props;
+const {
+  id,
+  title,
+  subtitle,
+  tagline,
+  footer,
+  disclaimer,
+  senderEmail = 'no-reply@datahubz.com',
+  recipient,
+  inputs,
+} = props;
+
+const cleanTitle = typeof title === 'string' ? title : title?.label || '';
+const cleanSubtitle = typeof subtitle === 'string' ? subtitle : subtitle?.label || '';
+const cleanTagline = typeof tagline === 'string' ? tagline : tagline?.label || '';
+
+const textarea = Array.isArray(inputs) ? inputs.find(i => i.type === 'textarea') ?? undefined : undefined;
+const otherInputs = Array.isArray(inputs) ? inputs.filter(i => i.type !== 'textarea') : [];
+---
+
+<WidgetWrapper id={id ?? 'contact-form'} isDark={false} containerClass="max-w-7xl mx-auto">
+  <Headline 
+    title={cleanTitle}
+    subtitle={cleanSubtitle}
+    tagline={cleanTagline}
+  />
+
+  <ContactForm
+    client:load
+    title={cleanTitle}
+    inputs={otherInputs}
+    textarea={textarea}
+    disclaimer={disclaimer}
+    description={footer}
+    senderEmail={senderEmail}
+    recipient={recipient}
+    button={{ label: 'Submit' }}
+  />
+</WidgetWrapper>

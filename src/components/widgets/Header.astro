@@ -1,0 +1,78 @@
+---
+import Icon from 'astro-icon';
+import Logo from '~/components/Logo.astro';
+import ToggleMenu from '~/components/common/ToggleMenu.astro';
+import { getHomePermalink, trimSlash } from '~/utils/permalinks';
+
+const {
+  id = 'header',
+  links = [],
+  isSticky = false,
+  isDark = false,
+  isFullWidth = false,
+  showToggleTheme = false,
+  session = null,
+} = Astro.props;
+
+const currentPath = new URL(Astro.url).pathname;
+---
+
+<header
+  class:list={[
+    { sticky: isSticky, relative: !isSticky, dark: isDark },
+    'top-0 z-40 flex-none mx-auto w-full border-b border-gray-50/0 transition-[opacity] ease-in-out',
+  ]}
+  {...(isSticky ? { 'data-aw-sticky-header': true } : {})}
+  {...(id ? { id } : {})}
+>
+  <div class="absolute inset-0"></div>
+  <div
+    class:list={[
+      'relative text-default py-3 px-3 md:px-6 mx-auto w-full flex items-center justify-between',
+      { 'max-w-7xl': !isFullWidth },
+    ]}
+  >
+    <!-- Left: Logo and Toggle Menu -->
+    <div class="flex items-center">
+      <a class="flex items-center" href="/">
+        <Logo />
+      </a>
+      <div class="flex items-center md:hidden ml-2">
+        <ToggleMenu />
+      </div>
+    </div>
+
+    <!-- Center: Dynamic Navigation -->
+    <nav class="hidden md:flex items-center flex-1 justify-center" aria-label="Main navigation">
+      <ul class="flex flex-col md:flex-row text-xl md:text-[0.9375rem] tracking-[0.01rem] font-medium">
+        {links.map(({ text, href }) => (
+          <li>
+            <a
+              href={href}
+              class:list={[
+                'hover:text-link dark:hover:text-white px-4 py-3 flex items-center whitespace-nowrap',
+                { 'aw-link-active': href === currentPath },
+              ]}
+            >
+              {text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <!-- Right: Theme Toggle + Logout -->
+    <div class="flex items-center space-x-4">
+      {session && (
+        <form method="POST" action="/api/logout">
+          <button
+            type="submit"
+            class="inline-flex items-center px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition"
+          >
+            Logout
+          </button>
+        </form>
+      )}
+    </div>
+  </div>
+</header>

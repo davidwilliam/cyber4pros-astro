@@ -1,5 +1,20 @@
-// @ts-check
+// astro.config.mjs
 import { defineConfig } from 'astro/config';
+import tailwind from '@astrojs/tailwind';
+import icons from 'astro-icon';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
-// https://astro.build/config
-export default defineConfig({});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export default defineConfig({
+  integrations: [tailwind(), icons()],
+  vite: {
+    resolve: {
+      alias: {
+        '~': resolve(__dirname, 'src'),
+      },
+    },
+  },
+});

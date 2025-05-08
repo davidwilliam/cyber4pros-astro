@@ -1,0 +1,201 @@
+---
+export const prerender = false;
+
+import Layout from '~/layouts/PageLayout.astro';
+import Hero from '~/components/widgets/Hero.astro';
+import Features from '~/components/widgets/Features.astro';
+import Content from '~/components/widgets/Content.astro';
+import Features2 from '~/components/widgets/Features2.astro';
+import Features3 from '~/components/widgets/Features3.astro';
+import CallToAction from '~/components/widgets/CallToAction.astro';
+import Stats from '~/components/widgets/Stats.astro';
+import Steps2 from '~/components/widgets/Steps2.astro';
+import TextBlocks from '~/components/widgets/TextBlocks.astro';
+import ContactUs from '~/components/widgets/Contact.astro';
+import { db } from '~/utils/db';
+import { Fragment } from 'astro/jsx-runtime';
+
+export async function getStaticPaths() {
+  const result = await db.query('SELECT slug FROM pages');
+  return result.rows.map((row) => ({
+    params: { slug: row.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+
+const result = await db.query(`SELECT * FROM pages WHERE slug = $1`, [slug]);
+if (!result.rows.length) {
+  return Astro.redirect('/404');
+}
+
+const page = result.rows[0];
+const sections = await db.query(`SELECT * FROM sections WHERE page_id = $1 ORDER BY "order"`, [page.id]);
+
+const metadata = {
+  title: page.name,
+};
+---
+
+<Layout metadata={metadata}>
+  <div class="pt-6">
+    {sections.rows.map((section) => {
+      const { id, type, data } = section;
+
+      if (type === 'hero') {
+        const image = data?.image?.src?.startsWith('http')
+          ? data.image
+          : { ...data?.image, src: data?.image?.src ?? '' };
+
+        return (
+          <Hero
+            id={`section-${id}`}
+            tagline={data.tagline}
+            actions={(data.actions || []).map(action => ({
+              variant: action.variant,
+              text: action.text,
+              href: action.href
+            }))}
+            image={image}
+          >
+            <Fragment slot="title" set:html={data.title} />
+            <Fragment slot="subtitle">{data.subtitle}</Fragment>
+          </Hero>
+        );
+      }
+
+      if (type === 'features') {
+        return (
+          <Features
+            id={`section-${id}`}
+            tagline={data.tagline}
+            title={data.title}
+            subtitle={data.subtitle}
+            items={data.features}
+          />
+        );
+      }
+
+      if (type === 'bullets') {
+        return (
+          <Content
+            id={`section-${id}`}
+            title={data.title}
+            subtitle={data.subtitle}
+            tagline={data.tagline}
+            items={data.items}
+            image={data.image}
+            isReversed={data.side === 'left'}
+          />
+        );
+      }
+
+      if (type === 'team') {
+        return (
+          <Features2
+            id={`section-${id}`}
+            tagline={data.tagline}
+            title={data.title}
+            subtitle={data.subtitle}
+            items={data.members}
+          />
+        );
+      }
+
+      if (type === 'cta') {
+        return (
+          <CallToAction
+            id={`section-${id}`}
+            tagline={data.tagline}
+            title={data.title}
+            subtitle={data.subtitle}
+            actions={data.actions}
+          />
+        );
+      }
+
+      if (type === 'numbers') {
+        return (
+          <Stats
+            id={`section-${id}`}
+            title={data.title}
+            stats={data.stats}
+          />
+        );
+      }
+
+      if (type === 'features3') {
+        return (
+          <Features3
+            id={`section-${id}`}
+            title={data.title}
+            subtitle={data.subtitle}
+            columns={3}
+            items={data.items}
+          />
+        );
+      }
+
+      if (type === 'numberedList') {
+        return (
+          <Steps2
+            id={`section-${id}`}
+            title={data.title}
+            subtitle={data.subtitle}
+            items={data.items}
+          />
+        );
+      }
+
+      if (type === 'smallCard') {
+        return (
+          <Features2
+            id={`section-${id}`}
+            tagline={data.tagline}
+            title={data.title}
+            columns={4}
+            items={data.items}
+          />
+        );
+      }
+
+      if (type === 'largeCard') {
+        return (
+          <Features2
+            id={`section-${id}`}
+            title={data.title}
+            subtitle={data.subtitle}
+            columns={3}
+            items={data.items}
+          />
+        );
+      }
+
+      if (type === 'textBlocks') {
+        return (
+          <TextBlocks
+            id={`section-${id}`}
+            blocks={data.blocks}
+          />
+        );
+      }
+
+      if (type === 'form') {
+        return (
+          <ContactUs
+            id={`section-${id}`}
+            title={typeof data.title === 'string' ? data.title : data.title?.label || ''}
+            subtitle={typeof data.subtitle === 'string' ? data.subtitle : data.subtitle?.label || ''}
+            inputs={data.inputs || []}
+            disclaimer={data.disclaimer}
+            description={data.footer}
+            recipient={data.recipient}
+            senderEmail={data.senderEmail}
+          />
+        );
+      }
+
+      return null;
+    })}
+  </div>
+</Layout>

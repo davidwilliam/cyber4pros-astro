@@ -1,0 +1,141 @@
+---
+// src/components/ContactForm.astro
+
+export interface InputField {
+  label: string;
+  name: string;
+  type: string;
+  placeholder?: string;
+  value?: string;
+  required?: boolean;
+  rows?: number;
+}
+
+export interface ContactFormProps {
+  title: string;
+  inputs: InputField[];
+  textarea?: InputField;
+  disclaimer?: string;
+  button?: { label: string };
+  description?: string;
+  senderEmail: string;
+  recipient: string;
+}
+
+const {
+  title,
+  inputs = [],
+  textarea,
+  disclaimer,
+  button,
+  description,
+  senderEmail,
+  recipient
+} = Astro.props;
+---
+
+<div class="flex flex-col max-w-xl mx-auto rounded-lg border border-gray-200 bg-white shadow p-4 sm:p-6 lg:p-8 w-full space-y-6">
+  <form id="contact-form" class="space-y-4">
+    {inputs.map((input) => (
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          {input.label}
+        </label>
+        <input
+          type={input.type}
+          name={input.name}
+          placeholder={input.placeholder}
+          value={input.value || ''}
+          required={input.required}
+          class="w-full border border-gray-300 rounded p-2"
+        />
+      </div>
+    ))}
+
+    {textarea && (
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          {textarea.label}
+        </label>
+        <textarea
+          name={textarea.name}
+          rows={textarea.rows || 6}
+          placeholder={textarea.placeholder}
+          class="w-full border border-gray-300 rounded p-2"
+        />
+      </div>
+    )}
+
+    {disclaimer && (
+      <label class="flex items-start text-sm text-gray-600 space-x-2">
+        <input type="checkbox" name="disclaimer" class="mt-1 border border-gray-300 rounded" />
+        <span>{disclaimer}</span>
+      </label>
+    )}
+
+    <button
+      type="submit"
+      class="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
+      id="submit-btn"
+    >
+      {button?.label || 'Submit'}
+    </button>
+
+    {description && (
+      <p class="text-sm text-gray-500 text-center">
+        {description}
+      </p>
+    )}
+  </form>
+</div>
+
+<script is:inline>
+  const form = document.getElementById('contact-form');
+  const submitBtn = document.getElementById('submit-btn');
+
+  const formTitle = `${title}`;
+  const sender = `${senderEmail}`;
+  const recipientEmail = `${recipient}`;
+  const submitLabel = `${button?.label || 'Submit'}`;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    const formData = new FormData(form);
+    const inputs = Array.from(formData.entries());
+
+    const payload = {
+      subject: 'Form Submission',
+      formTitle,
+      senderEmail: sender,
+      recipient: recipientEmail,
+      fields: inputs.map(([name, value]) => ({
+        label: name,
+        value: value
+      }))
+    };
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        alert('Form submitted successfully!');
+        form.reset();
+      } else {
+        alert(result.error || 'An error occurred');
+      }
+    } catch (err) {
+      alert('An error occurred');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = submitLabel;
+    }
+  });
+</script>
