@@ -1,0 +1,149 @@
+---
+export interface BaseProps {
+  label: string;
+  className?: string;
+}
+
+export interface TextInputProps extends BaseProps {
+  value: string;
+  onchange?: string;
+  type?: string;
+  name?: string;
+  id?: string;
+  placeholder?: string;
+}
+
+export interface TextareaProps extends BaseProps {
+  value: string;
+  onchange?: string;
+  rows?: number;
+}
+
+export interface SelectInputProps extends BaseProps {
+  value: string;
+  onchange?: string;
+  options: { label: string; value: string }[];
+}
+
+export interface NumberInputProps extends BaseProps {
+  value: number;
+  onchange?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+}
+
+export interface EditorTabsProps {
+  tabs: string[];
+  activeTab: string;
+  onclick?: string;
+}
+
+export interface ImageUploaderProps extends BaseProps {
+  id: string;
+  image?: { src: string; alt: string };
+  onchange?: string;
+}
+
+// Determine which component to render based on the Astro.props
+const componentType = Astro.props.componentType || '';
+---
+
+{componentType === 'TextInput' && (
+  <div class={`space-y-1 ${Astro.props.className || ''}`}>
+    <label class="block text-sm font-medium text-gray-700">{Astro.props.label}</label>
+    <input
+      type={Astro.props.type || "text"}
+      value={Astro.props.value || ''}
+      onchange={Astro.props.onchange}
+      name={Astro.props.name}
+      id={Astro.props.id}
+      placeholder={Astro.props.placeholder}
+      class={`w-full border p-2 rounded ${Astro.props.inputClassName || ''}`}
+    />
+  </div>
+)}
+
+{componentType === 'Textarea' && (
+  <div class={`space-y-1 ${Astro.props.className || ''}`}>
+    <label class="block text-sm font-medium text-gray-700">{Astro.props.label}</label>
+    <textarea
+      value={Astro.props.value || ''}
+      onchange={Astro.props.onchange}
+      rows={Astro.props.rows || 3}
+      name={Astro.props.name}
+      id={Astro.props.id}
+      placeholder={Astro.props.placeholder}
+      class={`w-full border p-2 rounded ${Astro.props.inputClassName || ''}`}
+    >{Astro.props.value}</textarea>
+  </div>
+)}
+
+{componentType === 'SelectInput' && (
+  <div class={`space-y-1 ${Astro.props.className || ''}`}>
+    <label class="block text-sm font-medium text-gray-700">{Astro.props.label}</label>
+    <select
+      value={Astro.props.value || ''}
+      onchange={Astro.props.onchange}
+      name={Astro.props.name}
+      id={Astro.props.id}
+      class={`w-full border p-2 rounded ${Astro.props.inputClassName || ''}`}
+    >
+      {Astro.props.options?.map((option: { label: string; value: string }) => (
+        <option value={option.value} selected={option.value === Astro.props.value}>{option.label}</option>
+      ))}
+    </select>
+  </div>
+)}
+
+{componentType === 'NumberInput' && (
+  <div class={`space-y-1 ${Astro.props.className || ''}`}>
+    <label class="block text-sm font-medium text-gray-700">{Astro.props.label}</label>
+    <input
+      type="number"
+      value={Astro.props.value}
+      onchange={Astro.props.onchange}
+      min={Astro.props.min}
+      max={Astro.props.max}
+      step={Astro.props.step}
+      name={Astro.props.name}
+      id={Astro.props.id}
+      class={`w-full border p-2 rounded ${Astro.props.inputClassName || ''}`}
+    />
+  </div>
+)}
+
+{componentType === 'EditorTabs' && (
+  <div class="flex space-x-4 border-b mb-4">
+    {Astro.props.tabs?.map((key: string) => (
+      <button
+        type="button"
+        data-tab={key}
+        onclick={Astro.props.onclick?.replace('$TAB', key) || `window.switchTab('${key}')`}
+        class={`pb-2 ${Astro.props.activeTab === key ? 'border-b-2 border-indigo-600 font-semibold' : 'text-gray-500'}`}
+      >
+        {key.charAt(0).toUpperCase() + key.slice(1)}
+      </button>
+    ))}
+  </div>
+)}
+
+{componentType === 'ImageUploader' && (
+  <div class={`space-y-3 ${Astro.props.className || ''}`}>
+    <label class="block text-sm font-medium text-gray-700" for={Astro.props.id}>{Astro.props.label}</label>
+    <input
+      type="file"
+      accept="image/*"
+      onchange={Astro.props.onchange}
+      id={Astro.props.id}
+      name={Astro.props.name}
+      class="block"
+    />
+    {Astro.props.image?.src && (
+      <>
+        <label class="block text-sm font-medium text-gray-700">Image Preview</label>
+        <img src={Astro.props.image.src} alt={Astro.props.image.alt || ''} class="rounded border w-full max-w-md" />
+      </>
+    )}
+  </div>
+)}

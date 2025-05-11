@@ -1,0 +1,22 @@
+---
+// This component has no props or visible output.
+---
+<script type="module" is:inline>
+  window.confirmDelete = async function (pageId, pageName) {
+    if (!confirm(`Are you sure you want to delete the page "${pageName}"? This will also remove all its sections.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/pages/${pageId}`, { method: 'DELETE' });
+      if (res.ok) {
+        location.reload();
+      } else {
+        alert('Failed to delete the page.');
+      }
+    } catch (err) {
+      console.error('Delete failed', err);
+      alert('An unexpected error occurred.');
+    }
+  };
+</script>

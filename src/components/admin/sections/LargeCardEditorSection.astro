@@ -1,0 +1,451 @@
+---
+import { showToast } from '~/utils/toast';
+import { saveSection } from '~/utils/editor';
+
+// Define interfaces for TypeScript
+export interface CardItem {
+  title: string;
+  description: string;
+  icon: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    title?: string;
+    subtitle?: string;
+    columns?: number;
+    items?: CardItem[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults for client script
+const initialState = {
+  id: data.id,
+  title: data.title || '',
+  subtitle: data.subtitle || '',
+  columns: data.columns || 3,
+  items: Array.isArray(data.items) ? data.items : []
+};
+
+// Available icons list
+const AVAILABLE_ICONS = [
+  'lucide:shield', 'lucide:cpu', 'lucide:scan-face', 'lucide:atom',
+  'lucide:leaf', 'lucide:lock', 'lucide:server', 'lucide:radar',
+  'lucide:database', 'lucide:globe', 'lucide:satellite', 'lucide:bug',
+  'lucide:antenna', 'lucide:network', 'lucide:key', 'lucide:eye',
+  'lucide:alert-circle', 'lucide:activity', 'lucide:terminal', 'lucide:cloud',
+  'lucide:info', 'lucide:bar-chart-3', 'lucide:wrench', 'lucide:phone',
+  'lucide:printer', 'lucide:mail', 'lucide:map-pin', 'lucide:globe-2',
+  'lucide:help-circle', 'lucide:user',
+];
+
+// Default active tab
+const initialTab = 'content';
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Large Card Section</h2>
+  
+  <!-- Tab navigation -->
+  <div id="tabs" class="flex border-b space-x-4">
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="content">Content</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="items">Items</button>
+  </div>
+
+  <!-- Content tab -->
+  <div id="content-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title</label>
+      <input 
+        type="text" 
+        id="title-input"
+        value={initialState.title} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <input 
+        type="text" 
+        id="subtitle-input"
+        value={initialState.subtitle} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Columns</label>
+      <input 
+        type="number" 
+        id="columns-input"
+        value={initialState.columns} 
+        min="1"
+        max="4"
+        class="w-full border p-2 rounded"
+      />
+    </div>
+  </div>
+
+  <!-- Items tab -->
+  <div id="items-tab" class="tab-content space-y-4" style="display: none;">
+    <div id="items-container">
+      {initialState.items.map((item, index) => (
+        <div class="border rounded p-4 space-y-2 bg-gray-50 mb-4" data-index={index}>
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Card Title</label>
+            <input
+              type="text"
+              value={item.title}
+              class="w-full border p-2 rounded item-title"
+              data-index={index}
+            />
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Card Description</label>
+            <textarea
+              rows="2"
+              class="w-full border p-2 rounded item-description"
+              data-index={index}
+            >{item.description}</textarea>
+          </div>
+          
+          <label class="block text-sm font-medium text-gray-700">Select Icon</label>
+          <div class="grid grid-cols-10 gap-2 icon-selector" data-index={index}>
+            {AVAILABLE_ICONS.map((iconName) => (
+              <button
+                type="button"
+                class={`p-2 rounded flex items-center justify-center icon-btn ${item.icon === iconName ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100'}`}
+                data-icon={iconName}
+                data-selected={item.icon === iconName ? 'true' : 'false'}
+              >
+                <span class="icon" data-icon={iconName}></span>
+              </button>
+            ))}
+          </div>
+          
+          <div class="text-right">
+            <button
+              type="button"
+              class="text-red-600 text-sm hover:underline remove-item"
+              data-index={index}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-item-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add card
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script is:inline src="https://code.iconify.design/2/2.2.1/iconify.min.js"></script>
+
+<script define:vars={{ initialState, initialTab, AVAILABLE_ICONS }}>
+  // State management
+  let formState = { ...initialState };
+  let activeTab = initialTab;
+  let isSaving = false;
+  
+  // DOM Elements
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const titleInput = document.getElementById('title-input');
+  const subtitleInput = document.getElementById('subtitle-input');
+  const columnsInput = document.getElementById('columns-input');
+  const itemsContainer = document.getElementById('items-container');
+  const addItemBtn = document.getElementById('add-item-btn');
+  const saveButton = document.getElementById('save-button');
+  
+  // Initialize
+  function init() {
+    // Set active tab
+    setActiveTab(activeTab);
+    
+    // Add event listeners to tab buttons
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setActiveTab(btn.dataset.tab);
+      });
+    });
+    
+    // Input fields for content tab
+    if (titleInput) {
+      titleInput.addEventListener('input', (e) => {
+        formState.title = e.target.value;
+      });
+    }
+    
+    if (subtitleInput) {
+      subtitleInput.addEventListener('input', (e) => {
+        formState.subtitle = e.target.value;
+      });
+    }
+    
+    if (columnsInput) {
+      columnsInput.addEventListener('input', (e) => {
+        formState.columns = Number(e.target.value);
+      });
+    }
+    
+    // Add item button
+    if (addItemBtn) {
+      addItemBtn.addEventListener('click', addItem);
+    }
+    
+    // Save button
+    if (saveButton) {
+      saveButton.addEventListener('click', handleSave);
+    }
+    
+    // Setup initial item event listeners
+    setupItemEventListeners();
+    
+    // Initialize icons
+    renderIcons();
+  }
+  
+  // Set active tab
+  function setActiveTab(tabId) {
+    activeTab = tabId;
+    
+    // Update tab button styles
+    tabButtons.forEach(btn => {
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('border-b-2', 'border-indigo-600', 'font-semibold');
+      } else {
+        btn.classList.remove('border-b-2', 'border-indigo-600', 'font-semibold');
+      }
+    });
+    
+    // Show/hide tab contents
+    tabContents.forEach(content => {
+      const contentId = content.id;
+      if (contentId === `${tabId}-tab`) {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    });
+  }
+  
+  // Handle saving
+  function handleSave() {
+    if (isSaving) return;
+    isSaving = true;
+    updateSaveButtonUI();
+    
+    // Import functions dynamically
+    import('~/utils/toast').then(({ showToast }) => {
+      import('~/utils/editor').then(({ saveSection }) => {
+        saveSection(
+          formState.id,
+          { 
+            title: formState.title, 
+            subtitle: formState.subtitle, 
+            columns: formState.columns,
+            items: formState.items 
+          },
+          () => {
+            showToast('Changes saved successfully!', 'success');
+            isSaving = false;
+            updateSaveButtonUI();
+          },
+          (err) => {
+            showToast(err instanceof Error ? err.message : err, 'error');
+            isSaving = false;
+            updateSaveButtonUI();
+          }
+        );
+      });
+    });
+  }
+  
+  // Update save button UI
+  function updateSaveButtonUI() {
+    if (saveButton) {
+      saveButton.textContent = isSaving ? 'Saving...' : 'Save Changes';
+      saveButton.disabled = isSaving;
+    }
+  }
+  
+  // Add a new item
+  function addItem() {
+    formState.items = [...formState.items, { title: '', description: '', icon: '' }];
+    updateItemsUI();
+  }
+  
+  // Update an item
+  function updateItem(index, field, value) {
+    formState.items = formState.items.map((item, i) => {
+      if (i === parseInt(index, 10)) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    });
+  }
+  
+  // Remove an item
+  function removeItem(index) {
+    formState.items = formState.items.filter((_, i) => i !== parseInt(index, 10));
+    updateItemsUI();
+  }
+  
+  // Update the items UI
+  function updateItemsUI() {
+    if (!itemsContainer) return;
+    
+    itemsContainer.innerHTML = '';
+    
+    formState.items.forEach((item, index) => {
+      const itemElement = document.createElement('div');
+      itemElement.className = 'border rounded p-4 space-y-2 bg-gray-50 mb-4';
+      itemElement.dataset.index = index.toString();
+      
+      itemElement.innerHTML = `
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Card Title</label>
+          <input
+            type="text"
+            value="${item.title || ''}"
+            class="w-full border p-2 rounded item-title"
+            data-index="${index}"
+          />
+        </div>
+        
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Card Description</label>
+          <textarea
+            rows="2"
+            class="w-full border p-2 rounded item-description"
+            data-index="${index}"
+          >${item.description || ''}</textarea>
+        </div>
+        
+        <label class="block text-sm font-medium text-gray-700">Select Icon</label>
+        <div class="grid grid-cols-10 gap-2 icon-selector" data-index="${index}">
+          ${AVAILABLE_ICONS.map(iconName => `
+            <button
+              type="button"
+              class="p-2 rounded flex items-center justify-center icon-btn ${item.icon === iconName ? 'bg-indigo-600 text-white' : 'hover:bg-gray-100'}"
+              data-icon="${iconName}"
+              data-selected="${item.icon === iconName ? 'true' : 'false'}"
+            >
+              <span class="icon" data-icon="${iconName}"></span>
+            </button>
+          `).join('')}
+        </div>
+        
+        <div class="text-right">
+          <button
+            type="button"
+            class="text-red-600 text-sm hover:underline remove-item"
+            data-index="${index}"
+          >
+            Remove
+          </button>
+        </div>
+      `;
+      
+      itemsContainer.appendChild(itemElement);
+    });
+    
+    setupItemEventListeners();
+    renderIcons();
+  }
+  
+  // Setup event listeners for dynamically created items
+  function setupItemEventListeners() {
+    // Title inputs
+    document.querySelectorAll('.item-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateItem(index, 'title', e.target.value);
+      });
+    });
+    
+    // Description textareas
+    document.querySelectorAll('.item-description').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateItem(index, 'description', e.target.value);
+      });
+    });
+    
+    // Icon buttons
+    document.querySelectorAll('.icon-selector').forEach(selector => {
+      const itemIndex = selector.dataset.index;
+      
+      selector.querySelectorAll('.icon-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const iconName = btn.dataset.icon;
+          updateItem(itemIndex, 'icon', iconName);
+          
+          // Update selected state
+          selector.querySelectorAll('.icon-btn').forEach(iconBtn => {
+            if (iconBtn.dataset.icon === iconName) {
+              iconBtn.classList.add('bg-indigo-600', 'text-white');
+              iconBtn.classList.remove('hover:bg-gray-100');
+              iconBtn.dataset.selected = 'true';
+            } else {
+              iconBtn.classList.remove('bg-indigo-600', 'text-white');
+              iconBtn.classList.add('hover:bg-gray-100');
+              iconBtn.dataset.selected = 'false';
+            }
+          });
+        });
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-item').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = e.target.dataset.index;
+        removeItem(index);
+      });
+    });
+  }
+  
+  // Render icons using Iconify
+  function renderIcons() {
+    document.querySelectorAll('.icon').forEach(iconSpan => {
+      const iconName = iconSpan.dataset.icon;
+      if (iconName && window.Iconify) {
+        iconSpan.innerHTML = '';
+        const iconSvg = window.Iconify.renderSVG(iconName, {
+          width: 24,
+          height: 24
+        });
+        
+        if (iconSvg) {
+          iconSpan.appendChild(iconSvg);
+        }
+      }
+    });
+  }
+  
+  // Initialize the component
+  init();
+</script>

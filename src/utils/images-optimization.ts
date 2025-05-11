@@ -1,5 +1,3 @@
-// src/utils/images-optimization.ts
-
 import type { HTMLAttributes } from 'astro/types';
 
 export interface ImageProps {
@@ -17,17 +15,11 @@ export interface ImageProps {
   widths?: number[] | null;
   aspectRatio?: string | number | null;
   objectPosition?: string;
-  format?: string;
 }
-
-export const isUnpicCompatible = (_image: string): boolean => {
-  return true; // override with real logic later if needed
-};
 
 export async function getImagesOptimized(
   src: string,
-  props: Pick<ImageProps, 'alt' | 'loading' | 'decoding' | 'fetchpriority'>,
-  _optimizer?: unknown
+  props: Pick<ImageProps, 'alt' | 'loading' | 'decoding' | 'fetchpriority'>
 ): Promise<{ src: string; attributes: HTMLAttributes<'img'> }> {
   return {
     src,

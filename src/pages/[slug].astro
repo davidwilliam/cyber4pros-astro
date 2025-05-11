@@ -13,7 +13,6 @@ import Steps2 from '~/components/widgets/Steps2.astro';
 import TextBlocks from '~/components/widgets/TextBlocks.astro';
 import ContactUs from '~/components/widgets/Contact.astro';
 import { db } from '~/utils/db';
-import { Fragment } from 'astro/jsx-runtime';
 
 export async function getStaticPaths() {
   const result = await db.query('SELECT slug FROM pages');
@@ -43,23 +42,25 @@ const metadata = {
       const { id, type, data } = section;
 
       if (type === 'hero') {
-        const image = data?.image?.src?.startsWith('http')
-          ? data.image
-          : { ...data?.image, src: data?.image?.src ?? '' };
+        const image = data?.image?.src
+          ? { src: data.image.src, alt: data.image?.alt || page.name }
+          : undefined;
+
+        console.log('Hero section image:', image);
 
         return (
           <Hero
             id={`section-${id}`}
             tagline={data.tagline}
-            actions={(data.actions || []).map(action => ({
+            actions={(data.actions || []).map((action: { text: string, href: string, variant: string }) => ({
               variant: action.variant,
               text: action.text,
               href: action.href
             }))}
             image={image}
           >
-            <Fragment slot="title" set:html={data.title} />
-            <Fragment slot="subtitle">{data.subtitle}</Fragment>
+            <div slot="title" set:html={data.title} />
+            <div slot="subtitle">{data.subtitle}</div>
           </Hero>
         );
       }
@@ -77,6 +78,10 @@ const metadata = {
       }
 
       if (type === 'bullets') {
+        const image = data?.image?.src ? 
+          { ...data.image, alt: data.image?.alt || data.title || page.name } : 
+          undefined;
+          
         return (
           <Content
             id={`section-${id}`}
@@ -84,7 +89,7 @@ const metadata = {
             subtitle={data.subtitle}
             tagline={data.tagline}
             items={data.items}
-            image={data.image}
+            image={image}
             isReversed={data.side === 'left'}
           />
         );
@@ -125,13 +130,24 @@ const metadata = {
       }
 
       if (type === 'features3') {
+        // Handle image for each item if needed
+        const enhancedItems = data.items?.map((item: any) => {
+          if (item.image) {
+            return {
+              ...item,
+              image: { ...item.image, alt: item.image.alt || item.title || page.name }
+            };
+          }
+          return item;
+        });
+        
         return (
           <Features3
             id={`section-${id}`}
             title={data.title}
             subtitle={data.subtitle}
             columns={3}
-            items={data.items}
+            items={enhancedItems}
           />
         );
       }

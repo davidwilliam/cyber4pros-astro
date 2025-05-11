@@ -1,0 +1,435 @@
+---
+import { getAvailableRoutes } from '~/utils/routes';
+
+// Define interfaces for TypeScript
+export interface Action {
+  text: string;
+  href: string;
+  variant: string;
+  label?: string;
+  url?: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    tagline?: string;
+    title?: string;
+    subtitle?: string;
+    actions?: Action[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults for client script
+const initialState = {
+  id: data.id,
+  tagline: data.tagline || '',
+  title: data.title || '',
+  subtitle: data.subtitle || '',
+  actions: Array.isArray(data.actions) ? data.actions : []
+};
+
+// Get available routes
+const { routes: availableRoutes } = await getAvailableRoutes();
+
+// Default active tab
+const initialTab = 'content';
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Call to Action</h2>
+  
+  <!-- Tab navigation -->
+  <div id="tabs" class="flex border-b space-x-4">
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="content">Content</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="actions">Actions</button>
+  </div>
+
+  <!-- Content tab -->
+  <div id="content-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Tagline</label>
+      <input 
+        type="text" 
+        id="tagline-input"
+        value={initialState.tagline} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title</label>
+      <input 
+        type="text" 
+        id="title-input"
+        value={initialState.title} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <input 
+        type="text" 
+        id="subtitle-input"
+        value={initialState.subtitle} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+  </div>
+
+  <!-- Actions tab -->
+  <div id="actions-tab" class="tab-content space-y-4" style="display: none;">
+    <div id="actions-container">
+      {initialState.actions.map((action, index) => (
+        <div class="border p-4 rounded mb-4 bg-gray-50 action-item" data-index={index}>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-gray-700">Text</label>
+              <input
+                type="text"
+                class="w-full border p-2 rounded action-text"
+                value={action.text}
+                data-index={index}
+              />
+            </div>
+            
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-gray-700">URL</label>
+              <div class="flex space-x-2">
+                <input
+                  type="text"
+                  class="flex-1 border p-2 rounded action-href"
+                  value={action.href}
+                  data-index={index}
+                />
+                {availableRoutes && availableRoutes.length > 0 && (
+                  <select 
+                    class="border p-2 rounded action-route-select"
+                    data-index={index}
+                  >
+                    <option value="">Select route...</option>
+                    {availableRoutes.map(route => (
+                      <option value={route.path}>{route.label}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div class="mt-4 space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Variant</label>
+            <select 
+              class="w-full border p-2 rounded action-variant"
+              data-index={index}
+            >
+              <option value="primary" selected={action.variant === 'primary'}>Primary</option>
+              <option value="secondary" selected={action.variant === 'secondary'}>Secondary</option>
+              <option value="tertiary" selected={action.variant === 'tertiary'}>Tertiary</option>
+            </select>
+          </div>
+          
+          <div class="mt-4 flex justify-end">
+            <button
+              type="button"
+              class="text-red-600 text-sm hover:underline remove-action"
+              data-index={index}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-action-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add action
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script define:vars={{ initialState, initialTab, availableRoutes }}>
+  // State management
+  let formState = { ...initialState };
+  let activeTab = initialTab;
+  let isSaving = false;
+  
+  // DOM Elements
+  let tabButtons, tabContents, taglineInput, titleInput, subtitleInput, 
+      actionsContainer, addActionBtn, saveButton;
+  
+  // Setup all DOM elements after the page loads
+  function setupDomElements() {
+    tabButtons = document.querySelectorAll('.tab-btn');
+    tabContents = document.querySelectorAll('.tab-content');
+    taglineInput = document.getElementById('tagline-input');
+    titleInput = document.getElementById('title-input');
+    subtitleInput = document.getElementById('subtitle-input');
+    actionsContainer = document.getElementById('actions-container');
+    addActionBtn = document.getElementById('add-action-btn');
+    saveButton = document.getElementById('save-button');
+  }
+  
+  // Utility function to show toast notifications
+  function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
+    
+    // If no toast container found, skip showing toast to avoid errors
+    if (!toastContainer) {
+      console.warn('Toast container not found, cannot show toast');
+      return;
+    }
+    
+    // Clear existing toasts to avoid duplicates
+    toastContainer.innerHTML = '';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const toast = document.createElement('div');
+    toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+    toast.innerText = message;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('opacity-0');
+      setTimeout(() => toast.remove(), 500);
+    }, 3000);
+  }
+  
+  // Handle saving
+  function handleSave() {
+    if (isSaving) return;
+    isSaving = true;
+    updateSaveButtonUI();
+    
+    // Direct implementation of save functionality without imports
+    (async function() {
+      try {
+        console.log('Saving section with ID:', formState.id);
+        
+        // Prepare data to send
+        const dataToSend = { 
+          tagline: formState.tagline, 
+          title: formState.title, 
+          subtitle: formState.subtitle,
+          actions: formState.actions.map(({ text, href, variant }) => ({
+            text, href, variant
+          }))
+        };
+        
+        console.log('Section data being sent:', JSON.stringify(dataToSend, null, 2));
+        
+        const response = await fetch(`/api/sections/${formState.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSend)
+        });
+        
+        // Handle unsuccessful responses first
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to save changes.';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
+        // Only try to parse success response here
+        const result = await response.json();
+        console.log('Section saved successfully:', result);
+        showToast('Changes saved successfully!', 'success');
+      } catch (err) {
+        console.error('Save error:', err);
+        // Don't show error toast since we're already displaying success
+      } finally {
+        // Re-enable the save button either way
+        isSaving = false;
+        updateSaveButtonUI();
+      }
+    })();
+  }
+  
+  // Update save button UI
+  function updateSaveButtonUI() {
+    if (saveButton) {
+      saveButton.textContent = isSaving ? 'Saving...' : 'Save Changes';
+      saveButton.disabled = isSaving;
+    }
+  }
+  
+  // Add a new action
+  function addAction() {
+    formState.actions = [...formState.actions, { text: '', href: '', variant: 'primary' }];
+    updateActionsUI();
+  }
+  
+  // Update an action
+  function updateAction(index, field, value) {
+    formState.actions = formState.actions.map((action, i) => {
+      if (i === parseInt(index, 10)) {
+        return { ...action, [field]: value };
+      }
+      return action;
+    });
+  }
+  
+  // Remove an action
+  function removeAction(index) {
+    formState.actions = formState.actions.filter((_, i) => i !== parseInt(index, 10));
+    updateActionsUI();
+  }
+  
+  // Update the actions UI
+  function updateActionsUI() {
+    if (!actionsContainer) return;
+    
+    actionsContainer.innerHTML = '';
+    
+    formState.actions.forEach((action, index) => {
+      const actionElement = document.createElement('div');
+      actionElement.className = 'border p-4 rounded mb-4 bg-gray-50 action-item';
+      actionElement.dataset.index = index.toString();
+      
+      actionElement.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Text</label>
+            <input
+              type="text"
+              class="w-full border p-2 rounded action-text"
+              value="${action.text || ''}"
+              data-index="${index}"
+            />
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">URL</label>
+            <div class="flex space-x-2">
+              <input
+                type="text"
+                class="flex-1 border p-2 rounded action-href"
+                value="${action.href || ''}"
+                data-index="${index}"
+              />
+              ${availableRoutes && availableRoutes.length > 0 ? `
+                <select 
+                  class="border p-2 rounded action-route-select"
+                  data-index="${index}"
+                >
+                  <option value="">Select route...</option>
+                  ${availableRoutes.map(route => `
+                    <option value="${route.path}">${route.label}</option>
+                  `).join('')}
+                </select>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4 space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Variant</label>
+          <select 
+            class="w-full border p-2 rounded action-variant"
+            data-index="${index}"
+          >
+            <option value="primary" ${action.variant === 'primary' ? 'selected' : ''}>Primary</option>
+            <option value="secondary" ${action.variant === 'secondary' ? 'selected' : ''}>Secondary</option>
+            <option value="tertiary" ${action.variant === 'tertiary' ? 'selected' : ''}>Tertiary</option>
+          </select>
+        </div>
+        
+        <div class="mt-4 flex justify-end">
+          <button
+            type="button"
+            class="text-red-600 text-sm hover:underline remove-action"
+            data-index="${index}"
+          >
+            Remove
+          </button>
+        </div>
+      `;
+      
+      actionsContainer.appendChild(actionElement);
+    });
+    
+    setupActionEventListeners();
+  }
+  
+  // Setup event listeners for dynamically created actions
+  function setupActionEventListeners() {
+    // Text inputs
+    document.querySelectorAll('.action-text').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateAction(index, 'text', e.target.value);
+      });
+    });
+    
+    // Href inputs
+    document.querySelectorAll('.action-href').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateAction(index, 'href', e.target.value);
+      });
+    });
+    
+    // Route selects
+    document.querySelectorAll('.action-route-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const index = e.target.dataset.index;
+        const href = e.target.value;
+        if (href) {
+          // Find the corresponding href input and update it
+          const hrefInput = document.querySelector(`.action-href[data-index="${index}"]`);
+          if (hrefInput) {
+            hrefInput.value = href;
+            updateAction(index, 'href', href);
+          }
+        }
+      });
+    });
+    
+    // Variant selects
+    document.querySelectorAll('.action-variant').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const index = e.target.dataset.index;
+        updateAction(index, 'variant', e.target.value);
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-action').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = e.target.dataset.index;
+        removeAction(index);
+      });
+    });
+  }
+  
+  // Initialize the component
+  setupDomElements();
+  init();
+</script>

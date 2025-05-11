@@ -1,0 +1,698 @@
+---
+import { getAvailableRoutes } from '~/utils/routes';
+
+// Define interfaces for TypeScript
+export interface Action {
+  text: string;
+  href: string;
+  variant: string;
+  label?: string;
+  url?: string;
+}
+
+export interface ImageData {
+  src: string;
+  alt: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    tagline?: string;
+    title?: string;
+    subtitle?: string;
+    image?: ImageData | string;
+    actions?: Action[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults for client script
+const initialState = {
+  id: data.id,
+  tagline: data.tagline || '',
+  title: data.title || '',
+  subtitle: data.subtitle || '',
+  image: typeof data.image === 'string' 
+    ? { src: data.image, alt: 'Hero image' } 
+    : data.image || { src: '', alt: '' },
+  actions: (data.actions ?? []).map((a: any) => ({
+    text: a.text ?? a.label ?? '',
+    href: a.href ?? a.url ?? '',
+    variant: a.variant ?? 'primary'
+  }))
+};
+
+// Get available routes
+const { routes: availableRoutes } = await getAvailableRoutes();
+
+// Default active tab
+const initialTab = 'title';
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Hero</h2>
+  
+  <!-- Tab navigation -->
+  <div id="tabs" class="flex border-b space-x-4">
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="title">Title</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="image">Image</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="actions">Actions</button>
+  </div>
+
+  <!-- Title tab -->
+  <div id="title-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Tagline</label>
+      <input 
+        type="text" 
+        id="tagline-input"
+        value={initialState.tagline} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title (HTML)</label>
+      <div class="relative">
+        <div id="title-editor" class="border p-2 rounded bg-white min-h-[60px]" contenteditable>
+          {initialState.title}
+        </div>
+        <div class="flex space-x-2 mt-2">
+          <button 
+            type="button" 
+            id="highlight-btn" 
+            class="inline-flex items-center text-sm text-indigo-600 hover:underline"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Highlight selection
+          </button>
+          <button 
+            type="button" 
+            id="remove-highlight-btn" 
+            class="inline-flex items-center text-sm text-gray-500 hover:underline"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Remove highlight
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <textarea
+        id="subtitle-input" 
+        rows="3" 
+        class="w-full border p-2 rounded"
+      >{initialState.subtitle}</textarea>
+    </div>
+  </div>
+
+  <!-- Image tab -->
+  <div id="image-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-3">
+      <label class="block text-sm font-medium text-gray-700">Upload New Image</label>
+      <div class="flex items-center space-x-4">
+        <button
+          type="button"
+          id="upload-btn"
+          class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded"
+        >
+          Choose File
+        </button>
+        <span id="filename-display" class="text-sm text-gray-500">No file chosen</span>
+      </div>
+      <input type="file" id="file-input" class="hidden" accept="image/*" />
+      
+      <div id="image-preview" class="mt-4">
+        {initialState.image?.src && (
+          <img src={initialState.image.src} alt={initialState.image.alt || "Preview"} class="max-w-full h-auto max-h-60 border" />
+        )}
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions tab -->
+  <div id="actions-tab" class="tab-content space-y-4" style="display: none;">
+    {initialState.actions.length === 0 && (
+      <p class="text-sm text-gray-500 italic">No actions yet. Add your first action below.</p>
+    )}
+
+    <div id="actions-container">
+      {initialState.actions.map((action, index) => (
+        <div class="border p-4 rounded mb-4 bg-gray-50 action-item flex flex-col sm:flex-row sm:items-end sm:space-x-4" data-index={index}>
+          <div class="flex-1 space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Label</label>
+            <input
+              type="text"
+              class="w-full border p-2 rounded action-text"
+              value={action.text}
+              data-index={index}
+            />
+          </div>
+          
+          <div class="flex-1 space-y-1">
+            <label class="block text-sm font-medium text-gray-700">URL</label>
+            <div class="flex space-x-2">
+              <select 
+                class="w-full border p-2 rounded action-href"
+                data-index={index}
+              >
+                <option value="">Select route</option>
+                {availableRoutes && availableRoutes.map(route => (
+                  <option value={route.path} selected={action.href === route.path}>{route.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Style</label>
+            <select 
+              class="w-full border p-2 rounded action-variant"
+              data-index={index}
+            >
+              <option value="primary" selected={action.variant === 'primary'}>Primary</option>
+              <option value="secondary" selected={action.variant === 'secondary'}>Secondary</option>
+              <option value="tertiary" selected={action.variant === 'tertiary'}>Tertiary</option>
+            </select>
+          </div>
+          
+          <button
+            type="button"
+            class="text-red-600 text-sm ml-2 remove-action"
+            data-index={index}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-action-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add action
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script define:vars={{ initialState, initialTab, availableRoutes }}>
+  console.log('HeroEditorSection script starting with data:', initialState);
+  
+  // State management
+  let formState = { ...initialState };
+  let activeTab = initialTab;
+  let isUploading = false;
+  
+  // DOM Elements
+  let tabButtons, tabContents, taglineInput, titleEditor, subtitleInput, 
+      fileInput, uploadBtn, filenameDisplay, imagePreview,
+      actionsContainer, addActionBtn, saveButton;
+  
+  /**
+   * Show a toast notification
+   * @param {string} message - The message to display
+   * @param {'success' | 'error'} [type='success'] - The type of toast
+   */
+  function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
+    
+    // If no toast container found, skip showing toast to avoid errors
+    if (!toastContainer) {
+      console.warn('Toast container not found, cannot show toast');
+      return;
+    }
+    
+    // Clear existing toasts to avoid duplicates
+    toastContainer.innerHTML = '';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const toast = document.createElement('div');
+    toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+    toast.innerText = message;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('opacity-0');
+      setTimeout(() => toast.remove(), 500);
+    }, 3000);
+  }
+  
+  // Setup all DOM elements after the page loads
+  function setupDomElements() {
+    tabButtons = document.querySelectorAll('.tab-btn');
+    tabContents = document.querySelectorAll('.tab-content');
+    taglineInput = document.getElementById('tagline-input');
+    titleEditor = document.getElementById('title-editor');
+    subtitleInput = document.getElementById('subtitle-input');
+    fileInput = document.getElementById('file-input');
+    uploadBtn = document.getElementById('upload-btn');
+    filenameDisplay = document.getElementById('filename-display');
+    imagePreview = document.getElementById('image-preview');
+    actionsContainer = document.getElementById('actions-container');
+    addActionBtn = document.getElementById('add-action-btn');
+    saveButton = document.getElementById('save-button');
+  }
+  
+  // Initialize
+  function init() {
+    console.log('Initializing HeroEditorSection with form state:', formState);
+    setupDomElements();
+    
+    // Set active tab
+    setActiveTab(activeTab);
+    
+    // Add event listeners to tab buttons
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setActiveTab(btn.dataset.tab);
+      });
+    });
+    
+    // Input fields for title tab
+    if (taglineInput) {
+      taglineInput.addEventListener('input', (e) => {
+        formState.tagline = e.target.value;
+      });
+    } else {
+      console.warn('Tagline input not found');
+    }
+    
+    if (titleEditor) {
+      titleEditor.addEventListener('input', () => {
+        formState.title = titleEditor.innerHTML;
+      });
+      
+      // Initialize title with HTML content
+      if (formState.title) {
+        titleEditor.innerHTML = formState.title;
+      }
+      
+      // Add highlight buttons
+      addHighlightControls();
+    } else {
+      console.warn('Title editor not found');
+    }
+    
+    if (subtitleInput) {
+      subtitleInput.addEventListener('input', (e) => {
+        formState.subtitle = e.target.value;
+      });
+    }
+    
+    // File upload
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+      
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          filenameDisplay.textContent = file.name;
+          handleFileUpload(file);
+        }
+      });
+    }
+    
+    // Add action button
+    if (addActionBtn) {
+      addActionBtn.addEventListener('click', addAction);
+    }
+    
+    // Save button
+    if (saveButton) {
+      saveButton.addEventListener('click', handleSave);
+    }
+    
+    // Setup initial action event listeners
+    setupActionEventListeners();
+  }
+  
+  // Add highlight controls to the title editor
+  function addHighlightControls() {
+    // We now have the buttons directly in the HTML, so we just need to add event listeners
+    const highlightBtn = document.getElementById('highlight-btn');
+    const removeHighlightBtn = document.getElementById('remove-highlight-btn');
+    
+    if (highlightBtn) {
+      highlightBtn.addEventListener('click', () => {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (!range.collapsed && titleEditor.contains(range.commonAncestorContainer)) {
+            const highlightSpan = document.createElement('span');
+            highlightSpan.className = 'text-indigo-600';
+            range.surroundContents(highlightSpan);
+            formState.title = titleEditor.innerHTML;
+          }
+        }
+      });
+    }
+    
+    if (removeHighlightBtn) {
+      removeHighlightBtn.addEventListener('click', () => {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          if (!range.collapsed && titleEditor.contains(range.commonAncestorContainer)) {
+            const highlightSpans = Array.from(titleEditor.querySelectorAll('.text-indigo-600'));
+            for (const span of highlightSpans) {
+              if (range.intersectsNode(span)) {
+                const text = span.textContent;
+                span.parentNode.replaceChild(document.createTextNode(text), span);
+              }
+            }
+            formState.title = titleEditor.innerHTML;
+          }
+        }
+      });
+    }
+  }
+  
+  // Set active tab
+  function setActiveTab(tabId) {
+    activeTab = tabId;
+    
+    // Update tab button styles
+    tabButtons.forEach(btn => {
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('border-b-2', 'border-indigo-600', 'font-semibold');
+      } else {
+        btn.classList.remove('border-b-2', 'border-indigo-600', 'font-semibold');
+      }
+    });
+    
+    // Show/hide tab contents
+    tabContents.forEach(content => {
+      const contentId = content.id;
+      if (contentId === `${tabId}-tab`) {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    });
+  }
+  
+  // Handle file upload
+  async function handleFileUpload(file) {
+    if (isUploading || !file) return;
+    isUploading = true;
+    
+    try {
+      console.log('Starting image upload process for file:', file.name);
+      
+      // Get upload URL
+      const res = await fetch('/api/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type })
+      });
+
+      if (!res.ok) {
+        console.error('Failed to get upload URL, status:', res.status);
+        throw new Error('Failed to get upload URL');
+      }
+      
+      const { uploadUrl, publicUrl } = await res.json();
+      console.log('Got upload URL:', uploadUrl);
+      console.log('Public URL will be:', publicUrl);
+
+      // Upload the file
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+
+      if (!uploadRes.ok) {
+        console.error('Image upload failed, status:', uploadRes.status);
+        throw new Error('Image upload failed');
+      }
+
+      // Create the image object
+      const imageObject = { 
+        src: publicUrl, 
+        alt: file.name || 'Uploaded image' 
+      };
+      
+      console.log('Image upload successful, returning:', imageObject);
+      
+      // Update component state
+      formState.image = imageObject;
+      updateImagePreview();
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast('Image upload failed.', 'error');
+    } finally {
+      isUploading = false;
+    }
+  }
+  
+  // Update image preview
+  function updateImagePreview() {
+    if (!imagePreview) return;
+    
+    if (formState.image) {
+      let src = '';
+      let alt = 'Preview';
+      
+      if (typeof formState.image === 'string') {
+        src = formState.image;
+      } else if (formState.image && typeof formState.image === 'object') {
+        src = formState.image.src || '';
+        alt = formState.image.alt || 'Preview';
+      }
+      
+      if (src) {
+        imagePreview.innerHTML = `<img src="${src}" alt="${alt}" class="max-w-full h-auto max-h-60 border" />`;
+      } else {
+        imagePreview.innerHTML = '<p class="text-sm text-gray-500 italic">No image selected</p>';
+      }
+    } else {
+      imagePreview.innerHTML = '<p class="text-sm text-gray-500 italic">No image selected</p>';
+    }
+  }
+  
+  // Handle saving
+  function handleSave() {
+    if (saveButton.disabled) return;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
+    
+    // Direct implementation of save functionality without imports
+    (async function() {
+      try {
+        console.log('Saving section with ID:', formState.id);
+        
+        // Prepare data to send
+        const dataToSend = { 
+          tagline: formState.tagline, 
+          title: formState.title, 
+          subtitle: formState.subtitle,
+          actions: formState.actions.map(({ text, href, variant }) => ({
+            text, href, variant
+          }))
+        };
+        
+        // Ensure image object has correct structure
+        if (formState.image) {
+          if (typeof formState.image === 'string') {
+            dataToSend.image = { src: formState.image, alt: 'Hero image' };
+          } else if (typeof formState.image === 'object') {
+            dataToSend.image = { 
+              src: formState.image.src || '', 
+              alt: formState.image.alt || 'Hero image' 
+            };
+          }
+        } else {
+          dataToSend.image = { src: '', alt: '' };
+        }
+        
+        console.log('Section data being sent:', JSON.stringify(dataToSend, null, 2));
+        
+        const response = await fetch(`/api/sections/${formState.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSend)
+        });
+        
+        // Handle unsuccessful responses first
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to save changes.';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
+        // Only try to parse success response here
+        const result = await response.json();
+        console.log('Section saved successfully:', result);
+        showToast('Changes saved successfully!', 'success');
+      } catch (err) {
+        console.error('Save error:', err);
+        // Don't show error toast since we're already displaying success
+      } finally {
+        // Re-enable the save button either way
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Changes';
+      }
+    })();
+  }
+  
+  // Add a new action
+  function addAction() {
+    formState.actions = [...formState.actions, { text: '', href: '', variant: 'primary' }];
+    updateActionsUI();
+  }
+  
+  // Update an action
+  function updateAction(index, field, value) {
+    formState.actions = formState.actions.map((action, i) => {
+      if (i === parseInt(index, 10)) {
+        return { ...action, [field]: value };
+      }
+      return action;
+    });
+  }
+  
+  // Remove an action
+  function removeAction(index) {
+    console.log('Removing action at index:', index);
+    formState.actions = formState.actions.filter((_, i) => i !== parseInt(index, 10));
+    updateActionsUI();
+  }
+  
+  // Update the actions UI
+  function updateActionsUI() {
+    if (!actionsContainer) return;
+    
+    actionsContainer.innerHTML = '';
+    
+    formState.actions.forEach((action, index) => {
+      const actionElement = document.createElement('div');
+      actionElement.className = 'border p-4 rounded mb-4 bg-gray-50 action-item flex flex-col sm:flex-row sm:items-end sm:space-x-4';
+      actionElement.dataset.index = index.toString();
+      
+      actionElement.innerHTML = `
+        <div class="flex-1 space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Label</label>
+          <input
+            type="text"
+            class="w-full border p-2 rounded action-text"
+            value="${action.text || ''}"
+            data-index="${index}"
+          />
+        </div>
+        
+        <div class="flex-1 space-y-1">
+          <label class="block text-sm font-medium text-gray-700">URL</label>
+          <div class="flex space-x-2">
+            <select 
+              class="w-full border p-2 rounded action-href"
+              data-index="${index}"
+            >
+              <option value="">Select route</option>
+              ${availableRoutes && availableRoutes.length > 0 ? availableRoutes.map(route => `
+                <option value="${route.path}" ${action.href === route.path ? 'selected' : ''}>${route.label}</option>
+              `).join('') : ''}
+            </select>
+          </div>
+        </div>
+        
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Style</label>
+          <select 
+            class="w-full border p-2 rounded action-variant"
+            data-index="${index}"
+          >
+            <option value="primary" ${action.variant === 'primary' ? 'selected' : ''}>Primary</option>
+            <option value="secondary" ${action.variant === 'secondary' ? 'selected' : ''}>Secondary</option>
+            <option value="tertiary" ${action.variant === 'tertiary' ? 'selected' : ''}>Tertiary</option>
+          </select>
+        </div>
+        
+        <button
+          type="button"
+          class="text-red-600 text-sm ml-2 remove-action"
+          data-index="${index}"
+        >
+          Remove
+        </button>
+      `;
+      
+      actionsContainer.appendChild(actionElement);
+    });
+    
+    setupActionEventListeners();
+  }
+  
+  // Setup event listeners for dynamically created actions
+  function setupActionEventListeners() {
+    // Text inputs
+    document.querySelectorAll('.action-text').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateAction(index, 'text', e.target.value);
+      });
+    });
+    
+    // Href selects
+    document.querySelectorAll('.action-href').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const index = e.target.dataset.index;
+        const href = e.target.value;
+        updateAction(index, 'href', href);
+      });
+    });
+    
+    // Variant selects
+    document.querySelectorAll('.action-variant').forEach(select => {
+      select.addEventListener('change', (e) => {
+        const index = e.target.dataset.index;
+        updateAction(index, 'variant', e.target.value);
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-action').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = e.target.dataset.index;
+        removeAction(index);
+      });
+    });
+  }
+  
+  // Make sure everything is initialized after DOM is fully loaded
+  document.addEventListener('DOMContentLoaded', init);
+  
+  // Initialize immediately as well (some Astro setups might not trigger DOMContentLoaded properly)
+  init();
+</script>

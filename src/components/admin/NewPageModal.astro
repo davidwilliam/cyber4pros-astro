@@ -1,0 +1,119 @@
+---
+// No props needed
+---
+
+<div id="new-page-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+    <h2 class="text-xl font-semibold mb-4">Create New Page</h2>
+
+    <label class="block text-sm font-medium text-gray-700">Page Name</label>
+    <input
+      id="new-page-name"
+      type="text"
+      class="w-full border p-2 rounded mb-2"
+    />
+
+    <p class="text-sm text-gray-500 mb-4">
+      Slug:
+      <code id="new-page-slug" class="bg-gray-100 px-2 py-1 rounded">...</code>
+    </p>
+
+    <div class="flex justify-end space-x-2">
+      <button
+        id="cancel-new-page"
+        class="px-4 py-2 text-gray-600 hover:text-black"
+      >
+        Cancel
+      </button>
+      <button
+        id="submit-new-page"
+        class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+        disabled
+      >
+        Create
+      </button>
+    </div>
+  </div>
+</div>
+
+<script type="module" is:inline>
+  const modal = document.getElementById('new-page-modal');
+  const nameInput = document.getElementById('new-page-name');
+  const slugOutput = document.getElementById('new-page-slug');
+  const cancelBtn = document.getElementById('cancel-new-page');
+  const submitBtn = document.getElementById('submit-new-page');
+
+  let name = '';
+  let slug = '';
+
+  document.addEventListener('open-new-page-modal', () => {
+    modal.classList.remove('hidden');
+    nameInput.focus();
+  });
+
+  nameInput.addEventListener('input', (e) => {
+    name = e.target.value;
+    slug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    slugOutput.textContent = slug || '...';
+    submitBtn.disabled = !name;
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    modal.classList.add('hidden');
+    nameInput.value = '';
+    slugOutput.textContent = '...';
+    submitBtn.disabled = true;
+  });
+
+  async function handleCreate() {
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
+    // Sanitize the slug
+    const sanitizedSlug = slug ? slug.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '';
+    
+    try {
+      console.log('Creating page with name:', name, 'and slug:', sanitizedSlug);
+      
+      const res = await fetch('/api/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          slug: sanitizedSlug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+        })
+      });
+      
+      if (res.ok) {
+        const result = await res.json();
+        alert(`Page "${name}" created successfully!`);
+        
+        // Ensure we have a valid URL slug to redirect to
+        const redirectSlug = result.slug && typeof result.slug === 'string' && result.slug !== '[object Object]'
+          ? result.slug
+          : sanitizedSlug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          
+        console.log('Redirecting to:', `/admin/pages/${redirectSlug}`);
+        window.location.href = `/admin/pages/${redirectSlug}`;
+      } else {
+        const error = await res.json();
+        console.error('Error creating page:', error);
+        alert(error.message || 'Failed to create page');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create';
+      }
+    } catch (error) {
+      console.error('Error creating page:', error);
+      alert('Failed to create page');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create';
+    }
+  }
+
+  submitBtn.addEventListener('click', handleCreate);
+</script>

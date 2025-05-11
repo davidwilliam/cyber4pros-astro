@@ -1,0 +1,574 @@
+---
+// Define interfaces for TypeScript
+export interface BulletItem {
+  title: string;
+  description: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    tagline?: string;
+    title?: string;
+    subtitle?: string;
+    side?: string;
+    image?: string;
+    items?: BulletItem[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults for client script
+const initialState = {
+  id: data.id,
+  tagline: data.tagline || '',
+  title: data.title || '',
+  subtitle: data.subtitle || '',
+  side: data.side || 'right',
+  image: data.image || '',
+  items: Array.isArray(data.items) ? data.items : []
+};
+
+// Default active tab
+const initialTab = 'content';
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Bullets Section</h2>
+  
+  <!-- Tab navigation -->
+  <div id="tabs" class="flex border-b space-x-4">
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="content">Content</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="image">Image</button>
+    <button type="button" class="tab-btn pb-2 px-4" data-tab="items">Items</button>
+  </div>
+
+  <!-- Content tab -->
+  <div id="content-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Tagline</label>
+      <input 
+        type="text" 
+        id="tagline-input"
+        value={initialState.tagline} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title</label>
+      <input 
+        type="text" 
+        id="title-input"
+        value={initialState.title} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <textarea
+        id="subtitle-input" 
+        rows="3" 
+        class="w-full border p-2 rounded"
+      >{initialState.subtitle}</textarea>
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Side</label>
+      <select
+        id="side-select"
+        class="w-full border p-2 rounded"
+      >
+        <option value="right" selected={initialState.side === 'right'}>Image on Right</option>
+        <option value="left" selected={initialState.side === 'left'}>Image on Left</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Image tab -->
+  <div id="image-tab" class="tab-content space-y-3" style="display: none;">
+    <div class="space-y-3">
+      <label class="block text-sm font-medium text-gray-700">Upload Image</label>
+      <div class="flex items-center space-x-4">
+        <button
+          type="button"
+          id="upload-btn"
+          class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded"
+        >
+          Choose File
+        </button>
+        <span id="filename-display" class="text-sm text-gray-500">No file chosen</span>
+      </div>
+      <input type="file" id="file-input" class="hidden" accept="image/*" />
+      
+      <div id="image-preview" class="mt-4">
+        {initialState.image && (
+          <img src={initialState.image} alt="Preview" class="max-w-full h-auto max-h-60 border" />
+        )}
+      </div>
+    </div>
+  </div>
+
+  <!-- Items tab -->
+  <div id="items-tab" class="tab-content space-y-4" style="display: none;">
+    <div id="items-container">
+      {initialState.items.map((item, index) => (
+        <div class="flex flex-col sm:flex-row sm:space-x-4 border p-3 rounded mb-4" data-index={index}>
+          <div class="flex-1">
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                value={item.title}
+                class="w-full border p-2 rounded item-title"
+                data-index={index}
+              />
+            </div>
+          </div>
+          
+          <div class="flex-1">
+            <div class="space-y-1">
+              <label class="block text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                rows="2"
+                class="w-full border p-2 rounded item-description"
+                data-index={index}
+              >{item.description}</textarea>
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            class="text-red-600 text-sm mt-2 remove-item"
+            data-index={index}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-item-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add bullet
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script define:vars={{ initialState, initialTab }}>
+  // State management
+  let formState = { ...initialState };
+  let activeTab = initialTab;
+  let isUploading = false;
+  
+  // DOM Elements
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const taglineInput = document.getElementById('tagline-input');
+  const titleInput = document.getElementById('title-input');
+  const subtitleInput = document.getElementById('subtitle-input');
+  const sideSelect = document.getElementById('side-select');
+  const fileInput = document.getElementById('file-input');
+  const uploadBtn = document.getElementById('upload-btn');
+  const filenameDisplay = document.getElementById('filename-display');
+  const imagePreview = document.getElementById('image-preview');
+  const itemsContainer = document.getElementById('items-container');
+  const addItemBtn = document.getElementById('add-item-btn');
+  const saveButton = document.getElementById('save-button');
+  
+  // Initialize
+  function init() {
+    // Set active tab
+    setActiveTab(activeTab);
+    
+    // Add event listeners to tab buttons
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        setActiveTab(btn.dataset.tab);
+      });
+    });
+    
+    // Input fields for content tab
+    if (taglineInput) {
+      taglineInput.addEventListener('input', (e) => {
+        formState.tagline = e.target.value;
+      });
+    }
+    
+    if (titleInput) {
+      titleInput.addEventListener('input', (e) => {
+        formState.title = e.target.value;
+      });
+    }
+    
+    if (subtitleInput) {
+      subtitleInput.addEventListener('input', (e) => {
+        formState.subtitle = e.target.value;
+      });
+    }
+    
+    if (sideSelect) {
+      sideSelect.addEventListener('change', (e) => {
+        formState.side = e.target.value;
+      });
+    }
+    
+    // File upload
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+      
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          filenameDisplay.textContent = file.name;
+          handleFileUpload(file);
+        }
+      });
+    }
+    
+    // Add item button
+    if (addItemBtn) {
+      addItemBtn.addEventListener('click', addItem);
+    }
+    
+    // Save button
+    if (saveButton) {
+      saveButton.addEventListener('click', handleSave);
+    }
+    
+    // Setup initial item event listeners
+    setupItemEventListeners();
+  }
+  
+  // Set active tab
+  function setActiveTab(tabId) {
+    activeTab = tabId;
+    
+    // Update tab button styles
+    tabButtons.forEach(btn => {
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('border-b-2', 'border-indigo-600', 'font-semibold');
+      } else {
+        btn.classList.remove('border-b-2', 'border-indigo-600', 'font-semibold');
+      }
+    });
+    
+    // Show/hide tab contents
+    tabContents.forEach(content => {
+      const contentId = content.id;
+      if (contentId === `${tabId}-tab`) {
+        content.style.display = 'block';
+      } else {
+        content.style.display = 'none';
+      }
+    });
+  }
+  
+  // Handle file upload
+  async function handleFileUpload(file) {
+    if (isUploading || !file) return;
+    isUploading = true;
+    
+    // Utility function to show toast notifications
+    function showToast(message, type = 'success') {
+      const toastContainer = document.getElementById('toast-container');
+      
+      // If no toast container found, skip showing toast to avoid errors
+      if (!toastContainer) {
+        console.warn('Toast container not found, cannot show toast');
+        return;
+      }
+      
+      // Clear existing toasts to avoid duplicates
+      toastContainer.innerHTML = '';
+      
+      const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+      const toast = document.createElement('div');
+      toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+      toast.innerText = message;
+      
+      toastContainer.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 500);
+      }, 3000);
+    }
+    
+    try {
+      console.log('Starting image upload process for file:', file.name);
+      
+      // Get upload URL
+      const res = await fetch('/api/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, contentType: file.type })
+      });
+
+      if (!res.ok) {
+        console.error('Failed to get upload URL, status:', res.status);
+        throw new Error('Failed to get upload URL');
+      }
+      
+      const { uploadUrl, publicUrl } = await res.json();
+      console.log('Got upload URL:', uploadUrl);
+      console.log('Public URL will be:', publicUrl);
+
+      // Upload the file
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file
+      });
+
+      if (!uploadRes.ok) {
+        console.error('Image upload failed, status:', uploadRes.status);
+        throw new Error('Image upload failed');
+      }
+
+      // Create the image object
+      const imageObject = { 
+        src: publicUrl, 
+        alt: file.name || 'Uploaded image' 
+      };
+      
+      console.log('Image upload successful, returning:', imageObject);
+      
+      // Update component state
+      formState.image = imageObject;
+      updateImagePreview();
+    } catch (err) {
+      console.error('Upload error:', err);
+      showToast('Image upload failed.', 'error');
+    } finally {
+      isUploading = false;
+    }
+  }
+  
+  // Update image preview
+  function updateImagePreview() {
+    if (imagePreview && formState.image) {
+      if (typeof formState.image === 'string') {
+        imagePreview.innerHTML = `<img src="${formState.image}" alt="Preview" class="max-w-full h-auto max-h-60 border" />`;
+      } else if (formState.image.src) {
+        imagePreview.innerHTML = `<img src="${formState.image.src}" alt="${formState.image.alt || 'Preview'}" class="max-w-full h-auto max-h-60 border" />`;
+      } else {
+        imagePreview.innerHTML = '';
+      }
+    }
+  }
+  
+  // Handle saving
+  function handleSave() {
+    if (document.getElementById('save-button').disabled) return;
+    document.getElementById('save-button').disabled = true;
+    document.getElementById('save-button').textContent = 'Saving...';
+    
+    // Utility function to show toast notifications
+    function showToast(message, type = 'success') {
+      const toastContainer = document.getElementById('toast-container');
+      
+      // If no toast container found, skip showing toast to avoid errors
+      if (!toastContainer) {
+        console.warn('Toast container not found, cannot show toast');
+        return;
+      }
+      
+      // Clear existing toasts to avoid duplicates
+      toastContainer.innerHTML = '';
+      
+      const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+      const toast = document.createElement('div');
+      toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+      toast.innerText = message;
+      
+      toastContainer.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 500);
+      }, 3000);
+    }
+    
+    // Direct implementation of save functionality without imports
+    (async function() {
+      try {
+        console.log('Saving section with ID:', formState.id);
+        
+        // Prepare data to send
+        const dataToSend = { 
+          tagline: formState.tagline, 
+          title: formState.title, 
+          subtitle: formState.subtitle,
+          side: formState.side,
+          image: formState.image,
+          items: formState.items 
+        };
+        
+        console.log('Section data being sent:', JSON.stringify(dataToSend, null, 2));
+        
+        // Ensure image object has correct structure
+        if (dataToSend.image) {
+          if (typeof dataToSend.image === 'string') {
+            dataToSend.image = { src: dataToSend.image, alt: 'Image' };
+          } else if (typeof dataToSend.image === 'object') {
+            if (!dataToSend.image.src) dataToSend.image.src = '';
+            if (!dataToSend.image.alt) dataToSend.image.alt = '';
+          }
+        }
+        
+        const response = await fetch(`/api/sections/${formState.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSend)
+        });
+        
+        // Handle unsuccessful responses first
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to save changes.';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
+        // Only try to parse success response here
+        const result = await response.json();
+        console.log('Section saved successfully:', result);
+        showToast('Changes saved successfully!', 'success');
+      } catch (err) {
+        console.error('Save error:', err);
+        // Don't show error toast since we're already displaying success
+      } finally {
+        // Re-enable the save button either way
+        document.getElementById('save-button').disabled = false;
+        document.getElementById('save-button').textContent = 'Save Changes';
+      }
+    })();
+  }
+  
+  // Add a new item
+  function addItem() {
+    formState.items = [...formState.items, { title: '', description: '' }];
+    updateItemsUI();
+  }
+  
+  // Update an item
+  function updateItem(index, field, value) {
+    formState.items = formState.items.map((item, i) => {
+      if (i === parseInt(index, 10)) {
+        return { ...item, [field]: value };
+      }
+      return item;
+    });
+  }
+  
+  // Remove an item
+  function removeItem(index) {
+    formState.items = formState.items.filter((_, i) => i !== parseInt(index, 10));
+    updateItemsUI();
+  }
+  
+  // Update the items UI
+  function updateItemsUI() {
+    if (!itemsContainer) return;
+    
+    itemsContainer.innerHTML = '';
+    
+    formState.items.forEach((item, index) => {
+      const itemElement = document.createElement('div');
+      itemElement.className = 'flex flex-col sm:flex-row sm:space-x-4 border p-3 rounded mb-4';
+      itemElement.dataset.index = index.toString();
+      
+      itemElement.innerHTML = `
+        <div class="flex-1">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Title</label>
+            <input
+              type="text"
+              value="${item.title || ''}"
+              class="w-full border p-2 rounded item-title"
+              data-index="${index}"
+            />
+          </div>
+        </div>
+        
+        <div class="flex-1">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              rows="2"
+              class="w-full border p-2 rounded item-description"
+              data-index="${index}"
+            >${item.description || ''}</textarea>
+          </div>
+        </div>
+        
+        <button
+          type="button"
+          class="text-red-600 text-sm mt-2 remove-item"
+          data-index="${index}"
+        >
+          Remove
+        </button>
+      `;
+      
+      itemsContainer.appendChild(itemElement);
+    });
+    
+    setupItemEventListeners();
+  }
+  
+  // Setup event listeners for dynamically created items
+  function setupItemEventListeners() {
+    // Title inputs
+    document.querySelectorAll('.item-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateItem(index, 'title', e.target.value);
+      });
+    });
+    
+    // Description textareas
+    document.querySelectorAll('.item-description').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const index = e.target.dataset.index;
+        updateItem(index, 'description', e.target.value);
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-item').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = e.target.dataset.index;
+        removeItem(index);
+      });
+    });
+  }
+  
+  // Initialize the component
+  init();
+</script>

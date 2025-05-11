@@ -1,0 +1,251 @@
+---
+import { showToast } from '~/utils/toast';
+import { saveSection } from '~/utils/editor';
+
+// Define interfaces
+export interface Block {
+  title: string;
+  body: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    blocks?: Block[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults
+const initialState = {
+  id: data.id,
+  blocks: Array.isArray(data.blocks) ? data.blocks : []
+};
+
+// Define variable for client script
+let initialIsSaving = false;
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Text Blocks</h2>
+  
+  <!-- We're using a simplified tab system since there's only one tab -->
+  <div class="flex border-b mb-4">
+    <div class="border-b-2 border-indigo-600 font-semibold pb-2 px-4">Content</div>
+  </div>
+
+  <!-- Content Tab -->
+  <div id="content-tab" class="space-y-6">
+    <div id="blocks-container">
+      {initialState.blocks.map((block, index) => (
+        <div class="border border-gray-200 p-4 rounded-lg bg-gray-50 shadow-sm space-y-4 mb-4" data-index={index}>
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Block Title</label>
+            <input
+              type="text"
+              value={block.title}
+              class="w-full border p-2 rounded block-title"
+              data-index={index}
+            />
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Block Body</label>
+            <textarea
+              rows={5}
+              class="w-full border p-2 rounded block-body"
+              data-index={index}
+            >{block.body}</textarea>
+          </div>
+          
+          <div class="flex justify-end">
+            <button
+              type="button"
+              class="text-sm text-red-600 hover:underline remove-block"
+              data-index={index}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <div>
+      <button
+        type="button"
+        id="add-block-btn"
+        class="text-sm text-indigo-600 hover:underline"
+      >
+        + Add Block
+      </button>
+    </div>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script define:vars={{ initialState, initialIsSaving }}>
+  // State management
+  let formState = { ...initialState };
+  let isSaving = initialIsSaving;
+  
+  // DOM Elements
+  const blocksContainer = document.getElementById('blocks-container');
+  const addBlockBtn = document.getElementById('add-block-btn');
+  const saveButton = document.getElementById('save-button');
+  
+  // Update block value
+  function updateBlock(index, field, value) {
+    formState.blocks = formState.blocks.map((block, i) => {
+      if (i === index) {
+        return { ...block, [field]: value };
+      }
+      return block;
+    });
+  }
+  
+  // Remove a block
+  function removeBlock(index) {
+    formState.blocks = formState.blocks.filter((_, i) => i !== index);
+    updateBlocksUI();
+  }
+  
+  // Add a new block
+  function addBlock() {
+    formState.blocks = [...formState.blocks, { title: '', body: '' }];
+    updateBlocksUI();
+  }
+
+  // Handle save
+  function handleSave() {
+    if (isSaving) return;
+    isSaving = true;
+    updateSaveButtonUI();
+    
+    // Import functions dynamically
+    import('~/utils/toast').then(({ showToast }) => {
+      import('~/utils/editor').then(({ saveSection }) => {
+        saveSection(
+          formState.id,
+          { blocks: formState.blocks },
+          () => {
+            showToast('Changes saved successfully!', 'success');
+            isSaving = false;
+            updateSaveButtonUI();
+          },
+          (err) => {
+            console.error('Save error:', err);
+            showToast(err instanceof Error ? err.message : 'Failed to save changes', 'error');
+            isSaving = false;
+            updateSaveButtonUI();
+          }
+        );
+      });
+    });
+  }
+  
+  // Update the blocks UI
+  function updateBlocksUI() {
+    if (!blocksContainer) return;
+    
+    blocksContainer.innerHTML = '';
+    
+    formState.blocks.forEach((block, index) => {
+      const blockElement = document.createElement('div');
+      blockElement.className = 'border border-gray-200 p-4 rounded-lg bg-gray-50 shadow-sm space-y-4 mb-4';
+      blockElement.dataset.index = index.toString();
+      
+      blockElement.innerHTML = `
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Block Title</label>
+          <input
+            type="text"
+            value="${block.title || ''}"
+            class="w-full border p-2 rounded block-title"
+            data-index="${index}"
+          />
+        </div>
+        
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Block Body</label>
+          <textarea
+            rows="5"
+            class="w-full border p-2 rounded block-body"
+            data-index="${index}"
+          >${block.body || ''}</textarea>
+        </div>
+        
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="text-sm text-red-600 hover:underline remove-block"
+            data-index="${index}"
+          >
+            Remove
+          </button>
+        </div>
+      `;
+      
+      blocksContainer.appendChild(blockElement);
+    });
+    
+    setupBlockEventListeners();
+  }
+
+  // Update save button UI based on isSaving state
+  function updateSaveButtonUI() {
+    if (saveButton) {
+      saveButton.textContent = isSaving ? 'Saving...' : 'Save Changes';
+      saveButton.disabled = isSaving;
+    }
+  }
+  
+  // Setup event listeners for dynamically created blocks
+  function setupBlockEventListeners() {
+    // Title inputs
+    document.querySelectorAll('.block-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        updateBlock(index, 'title', e.target.value);
+      });
+    });
+    
+    // Body textareas
+    document.querySelectorAll('.block-body').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        updateBlock(index, 'body', e.target.value);
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-block').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        removeBlock(index);
+      });
+    });
+  }
+
+  // Add event listeners
+  if (addBlockBtn) {
+    addBlockBtn.addEventListener('click', addBlock);
+  }
+  
+  if (saveButton) {
+    saveButton.addEventListener('click', handleSave);
+  }
+  
+  // Setup initial event listeners
+  setupBlockEventListeners();
+</script>

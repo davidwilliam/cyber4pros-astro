@@ -1,0 +1,76 @@
+---
+const { value, onChange } = Astro.props;
+---
+
+<div class="border p-2 rounded bg-white relative">
+  <div
+    id="highlight-editor"
+    contenteditable="true"
+    class="w-full min-h-[48px] focus:outline-none"
+  >
+    {value}
+  </div>
+
+  <button
+    type="button"
+    id="highlight-button"
+    class="mt-2 inline-flex items-center text-sm text-indigo-600 hover:underline"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+      <path d="M8 3h13M9 3v18M7 15l10-10"></path>
+    </svg>
+    Highlight selection
+  </button>
+</div>
+
+<script>
+  // Function to handle the text highlighting
+  const handleHighlight = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return;
+
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString();
+    const parent = range.commonAncestorContainer.parentElement;
+
+    if (parent && parent.tagName === 'SPAN' && parent.classList.contains('text-accent')) {
+      const span = parent;
+      span.replaceWith(document.createTextNode(span.textContent || ''));
+    } else {
+      const span = document.createElement('span');
+      span.className = 'text-accent dark:text-white';
+      span.textContent = selectedText;
+      range.deleteContents();
+      range.insertNode(span);
+    }
+
+    // Update the content after highlighting
+    const editor = document.getElementById('highlight-editor');
+    if (editor) {
+      // Dispatch a custom event with the new content
+      const event = new CustomEvent('contentChange', {
+        detail: { content: editor.innerHTML }
+      });
+      document.dispatchEvent(event);
+    }
+  };
+
+  // Set up event listeners
+  document.addEventListener('DOMContentLoaded', () => {
+    const editor = document.getElementById('highlight-editor');
+    const highlightButton = document.getElementById('highlight-button');
+
+    if (editor && highlightButton) {
+      highlightButton.addEventListener('click', handleHighlight);
+      editor.addEventListener('blur', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        if (target) {
+          const event = new CustomEvent('contentChange', {
+            detail: { content: target.innerHTML }
+          });
+          document.dispatchEvent(event);
+        }
+      });
+    }
+  });
+</script>

@@ -1,0 +1,458 @@
+---
+import FormControls from '~/components/admin/common/FormControls.astro';
+
+// Define interfaces
+export interface Member {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    tagline?: string;
+    title?: string;
+    subtitle?: string;
+    members?: Member[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Initialize data with defaults
+const initialState = {
+  id: data.id,
+  tagline: typeof data.tagline === 'string' ? data.tagline : '',
+  title: typeof data.title === 'string' ? data.title : '',
+  subtitle: typeof data.subtitle === 'string' ? data.subtitle : '',
+  members: Array.isArray(data.members) ? data.members : []
+};
+
+// Available icons
+const AVAILABLE_ICONS = [
+  'lucide:user-circle', 'lucide:user-check', 'lucide:badge-check', 'lucide:award',
+  'lucide:briefcase', 'lucide:star', 'lucide:rocket', 'lucide:shield',
+  'lucide:cpu', 'lucide:globe',
+];
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Team</h2>
+  
+  <!-- Tabs -->
+  <div class="flex space-x-4 border-b mb-4">
+    {['content', 'members'].map((tabKey) => (
+      <button
+        type="button"
+        data-tab={tabKey}
+        class={`pb-2 ${tabKey === 'content' ? 'border-b-2 border-indigo-600 font-semibold' : 'text-gray-500'}`}
+        onclick={`switchTab('${tabKey}')`}
+      >
+        {tabKey.charAt(0).toUpperCase() + tabKey.slice(1)}
+      </button>
+    ))}
+  </div>
+
+  <!-- Content Tab -->
+  <div id="content-tab" class="space-y-3">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Tagline</label>
+      <input
+        type="text"
+        id="tagline-input"
+        value={initialState.tagline}
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title</label>
+      <input
+        type="text"
+        id="title-input"
+        value={initialState.title}
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <textarea
+        id="subtitle-input"
+        rows={2}
+        class="w-full border p-2 rounded"
+      >{initialState.subtitle}</textarea>
+    </div>
+  </div>
+
+  <!-- Members Tab -->
+  <div id="members-tab" class="space-y-4 pt-4 hidden">
+    <div id="members-container">
+      {initialState.members.map((member, index) => (
+        <div class="border p-4 rounded space-y-3 bg-gray-50 mb-4" data-index={index}>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Select Icon</label>
+          <div class="grid grid-cols-10 gap-2 icon-selector" data-index={index}>
+            {AVAILABLE_ICONS.map((iconName) => (
+              <button
+                type="button"
+                data-icon={iconName}
+                class={`border rounded p-2 flex items-center justify-center icon-btn ${
+                  member.icon === iconName ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-gray-100'
+                }`}
+              >
+                <span class="icon" data-icon={iconName}></span>
+              </button>
+            ))}
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Name</label>
+            <input
+              type="text"
+              value={member.title}
+              class="w-full border p-2 rounded member-title"
+              data-index={index}
+            />
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              rows={2}
+              class="w-full border p-2 rounded member-description"
+              data-index={index}
+            >{member.description}</textarea>
+          </div>
+          
+          <div class="text-right">
+            <button
+              type="button"
+              class="text-red-600 text-sm hover:underline remove-member"
+              data-index={index}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-member-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add member
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<script src="https://code.iconify.design/3/3.1.0/iconify.min.js" is:inline></script>
+
+<script define:vars={{ initialState, AVAILABLE_ICONS }}>
+  // State management
+  let activeTab = 'content';
+  let formState = { ...initialState };
+  
+  // DOM Elements
+  const contentTab = document.getElementById('content-tab');
+  const membersTab = document.getElementById('members-tab');
+  const taglineInput = document.getElementById('tagline-input');
+  const titleInput = document.getElementById('title-input');
+  const subtitleInput = document.getElementById('subtitle-input');
+  const membersContainer = document.getElementById('members-container');
+  const addMemberBtn = document.getElementById('add-member-btn');
+  const saveButton = document.getElementById('save-button');
+  
+  // Initialize icons
+  function initializeIcons() {
+    document.querySelectorAll('.icon').forEach(icon => {
+      const iconName = icon.dataset.icon;
+      if (iconName) {
+        icon.innerHTML = `<span class="iconify" data-icon="${iconName}"></span>`;
+      }
+    });
+  }
+  
+  // Add event listeners
+  document.querySelectorAll('[data-tab]').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      const tabName = tab.getAttribute('data-tab');
+      if (tabName) switchTab(tabName);
+    });
+  });
+  
+  if (taglineInput) {
+    taglineInput.addEventListener('input', (e) => {
+      formState.tagline = e.target.value;
+    });
+  }
+  
+  if (titleInput) {
+    titleInput.addEventListener('input', (e) => {
+      formState.title = e.target.value;
+    });
+  }
+  
+  if (subtitleInput) {
+    subtitleInput.addEventListener('input', (e) => {
+      formState.subtitle = e.target.value;
+    });
+  }
+  
+  if (addMemberBtn) {
+    addMemberBtn.addEventListener('click', () => {
+      addMember();
+    });
+  }
+  
+  if (saveButton) {
+    saveButton.addEventListener('click', () => {
+      handleSave();
+    });
+  }
+  
+  // Setup member event listeners
+  setupMemberEventListeners();
+  
+  // Switch between tabs
+  function switchTab(tab) {
+    activeTab = tab;
+    
+    if (contentTab) {
+      contentTab.classList.toggle('hidden', tab !== 'content');
+    }
+    
+    if (membersTab) {
+      membersTab.classList.toggle('hidden', tab !== 'members');
+    }
+    
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+      const btnTab = btn.getAttribute('data-tab');
+      const isActive = btnTab === tab;
+      
+      btn.classList.toggle('border-b-2', isActive);
+      btn.classList.toggle('border-indigo-600', isActive);
+      btn.classList.toggle('font-semibold', isActive);
+      btn.classList.toggle('text-gray-500', !isActive);
+    });
+  }
+  
+  // Add a new member
+  function addMember() {
+    formState.members = [...formState.members, { icon: '', title: '', description: '' }];
+    updateMembersUI();
+  }
+  
+  // Remove a member
+  function removeMember(index) {
+    formState.members = formState.members.filter((_, i) => i !== index);
+    updateMembersUI();
+  }
+  
+  // Update member value
+  function updateMember(index, field, value) {
+    formState.members = formState.members.map((member, i) => {
+      if (i === index) {
+        return { ...member, [field]: value };
+      }
+      return member;
+    });
+  }
+  
+  // Select icon
+  function selectIcon(index, iconName) {
+    formState.members = formState.members.map((member, i) => {
+      if (i === index) {
+        return { ...member, icon: iconName };
+      }
+      return member;
+    });
+    updateMembersUI();
+  }
+  
+  // Update the members UI
+  function updateMembersUI() {
+    if (!membersContainer) return;
+    
+    membersContainer.innerHTML = '';
+    
+    formState.members.forEach((member, index) => {
+      const memberElement = document.createElement('div');
+      memberElement.className = 'border p-4 rounded space-y-3 bg-gray-50 mb-4';
+      memberElement.dataset.index = index.toString();
+      
+      memberElement.innerHTML = `
+        <label class="block text-sm font-medium text-gray-700 mb-1">Select Icon</label>
+        <div class="grid grid-cols-10 gap-2 icon-selector" data-index="${index}">
+          ${AVAILABLE_ICONS.map(iconName => `
+            <button
+              type="button"
+              data-icon="${iconName}"
+              class="border rounded p-2 flex items-center justify-center icon-btn ${
+                member.icon === iconName ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-gray-100'
+              }"
+            >
+              <span class="icon" data-icon="${iconName}"></span>
+            </button>
+          `).join('')}
+        </div>
+        
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Name</label>
+          <input
+            type="text"
+            value="${member.title || ''}"
+            class="w-full border p-2 rounded member-title"
+            data-index="${index}"
+          />
+        </div>
+        
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700">Description</label>
+          <textarea
+            rows="2"
+            class="w-full border p-2 rounded member-description"
+            data-index="${index}"
+          >${member.description || ''}</textarea>
+        </div>
+        
+        <div class="text-right">
+          <button
+            type="button"
+            class="text-red-600 text-sm hover:underline remove-member"
+            data-index="${index}"
+          >
+            Remove
+          </button>
+        </div>
+      `;
+      
+      membersContainer.appendChild(memberElement);
+    });
+    
+    initializeIcons();
+    setupMemberEventListeners();
+  }
+  
+  // Setup event listeners for dynamically created members
+  function setupMemberEventListeners() {
+    // Title inputs
+    document.querySelectorAll('.member-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        updateMember(index, 'title', e.target.value);
+      });
+    });
+    
+    // Description textareas
+    document.querySelectorAll('.member-description').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        updateMember(index, 'description', e.target.value);
+      });
+    });
+    
+    // Icon buttons
+    document.querySelectorAll('.icon-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const iconName = button.dataset.icon;
+        const container = button.closest('.icon-selector');
+        const index = parseInt(container.dataset.index, 10);
+        
+        if (iconName && !isNaN(index)) {
+          selectIcon(index, iconName);
+        }
+      });
+    });
+    
+    // Remove buttons
+    document.querySelectorAll('.remove-member').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = parseInt(e.target.dataset.index, 10);
+        removeMember(index);
+      });
+    });
+  }
+  
+  // Utility function to show toast notifications
+  function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
+    
+    // If no toast container found, skip showing toast to avoid errors
+    if (!toastContainer) {
+      console.warn('Toast container not found, cannot show toast');
+      return;
+    }
+    
+    // Clear existing toasts to avoid duplicates
+    toastContainer.innerHTML = '';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const toast = document.createElement('div');
+    toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+    toast.innerText = message;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('opacity-0');
+      setTimeout(() => toast.remove(), 500);
+    }, 3000);
+  }
+  
+  // Save the section
+  async function handleSave() {
+    try {
+      const response = await fetch(`/api/sections/${initialState.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tagline: formState.tagline,
+          title: formState.title,
+          subtitle: formState.subtitle,
+          members: formState.members
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to save changes.';
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      console.log('Section saved successfully:', result);
+      showToast('Changes saved successfully!', 'success');
+    } catch (error) {
+      console.error('Save error:', error);
+      // Don't show error toast since we may already be displaying success
+    }
+  }
+  
+  // Initialize by selecting the content tab and rendering icons
+  window.switchTab = switchTab;
+  initializeIcons();
+  switchTab('content');
+</script> 

@@ -2,7 +2,6 @@
 import Layout from '~/layouts/Layout.astro';
 import HeaderWithRoutes from '~/components/HeaderWithRoutes.astro';
 import Footer from '~/components/widgets/Footer.astro';
-import Announcement from '~/components/widgets/Announcement.astro';
 import { getSessionFromRequest } from '~/utils/session';
 import '~/assets/styles/application.css';
 
@@ -30,7 +29,6 @@ const session = getSessionFromRequest(Astro.request);
   <slot name="header">
     <HeaderWithRoutes session={session} />
   </slot>
-  <div id="toast-container" class="fixed top-6 right-6 z-50 space-y-2"></div>
   <main>
     <slot />
   </main>

@@ -1,61 +1,57 @@
 ---
 import type { HTMLAttributes } from 'astro/types';
 import { findImage } from '~/utils/images';
-import {
-  getImagesOptimized,
-  astroAssetsOptimizer,
-  unpicOptimizer,
-  isUnpicCompatible,
-  type ImageProps,
-} from '~/utils/images-optimization';
 
-type Props = ImageProps;
-type ImageType = {
+export interface ImageProps extends HTMLAttributes<'img'> {
   src: string;
-  attributes: HTMLAttributes<'img'>;
-};
-
-const props = Astro.props;
-
-if (props.alt === undefined || props.alt === null) {
-  throw new Error();
+  alt: string;
+  width?: number | string;
+  height?: number | string;
+  loading?: 'lazy' | 'eager';
+  decoding?: 'async' | 'auto' | 'sync';
 }
 
-if (typeof props.width === 'string') {
-  props.width = parseInt(props.width);
+const props = Astro.props as ImageProps;
+
+// Validate required props
+if (!props.alt) {
+  throw new Error('Image component requires an "alt" attribute');
 }
 
-if (typeof props.height === 'string') {
-  props.height = parseInt(props.height);
-}
+// Process width and height if they're strings
+const width = typeof props.width === 'string' ? parseInt(props.width) : props.width;
+const height = typeof props.height === 'string' ? parseInt(props.height) : props.height;
 
-if (!props.loading) {
-  props.loading = 'lazy';
-}
+// Set default values
+const loading = props.loading || 'lazy';
+const decoding = props.decoding || 'async';
 
-if (!props.decoding) {
-  props.decoding = 'async';
-}
-
+// Get image from src
 const _image = await findImage(props.src);
 
-let image: ImageType | undefined = undefined;
+// Create image object
+const image = typeof _image === 'string'
+  ? { 
+      src: _image,
+      attributes: {} 
+    }
+  : null;
 
-if (
-  typeof _image === 'string' &&
-  (_image.startsWith('http://') || _image.startsWith('https://')) &&
-  isUnpicCompatible(_image)
-) {
-  image = await getImagesOptimized(_image, props, unpicOptimizer);
-} else if (_image) {
-  image = await getImagesOptimized(_image, props, astroAssetsOptimizer);
-}
+// Remove props that we've explicitly handled
+const { src: _, alt: __, width: ___, height: ____, loading: _____, decoding: ______, ...restProps } = props;
 ---
 
-{
-  !image ? (
-    <Fragment />
-  ) : (
-    <img src={image.src} crossorigin="anonymous" referrerpolicy="no-referrer" {...image.attributes} />
-  )
-}
+{!image ? null : (
+  <img
+    src={image.src}
+    alt={props.alt}
+    width={width}
+    height={height}
+    loading={loading}
+    decoding={decoding}
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+    {...image.attributes}
+    {...restProps}
+  />
+)}

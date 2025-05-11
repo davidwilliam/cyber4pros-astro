@@ -1,0 +1,153 @@
+---
+export const prerender = false;
+
+import { getSession } from '~/utils/auth';
+import { db } from '~/utils/db';
+
+import Layout from '~/layouts/PageLayout.astro';
+import NewPageModal from '~/components/admin/NewPageModal.astro';
+import DeletePageHandler from '~/components/admin/DeletePageHandler.astro';
+import DeletePageModal from '~/components/admin/DeletePageModal.astro';
+
+const session = getSession(Astro.request.headers);
+if (!session) {
+  return Astro.redirect('/login');
+}
+
+const metadata = {
+  title: 'Admin Dashboard',
+  ignoreTitleTemplate: false,
+};
+
+const pages = await db.query(`
+  SELECT id, name, slug
+  FROM public.pages
+  ORDER BY sort_order ASC NULLS LAST, created_at ASC
+`);
+
+// Add debugging for page rows
+console.log('Page rows:', pages.rows.map(page => ({
+  id: page.id,
+  name: page.name,
+  slug: page.slug,
+  slugType: typeof page.slug
+})));
+
+// Ensure all slugs are valid strings
+pages.rows.forEach(page => {
+  if (typeof page.slug !== 'string' || page.slug === '[object Object]') {
+    console.warn(`Invalid slug for page "${page.name}" (ID: ${page.id}), sanitizing`);
+    page.slug = page.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  }
+});
+---
+
+<Layout {metadata}>
+  <section class="max-w-5xl mx-auto py-12 px-4 space-y-8">
+    <!-- Title -->
+    <div class="flex items-center space-x-2">
+      <iconify-icon icon="heroicons-outline:chart-bar" class="w-8 h-8 text-gray-800" />
+      <h1 class="text-3xl font-bold">Admin Dashboard</h1>
+    </div>
+
+    <!-- Subtitle + New Page button -->
+    <div class="flex items-center justify-between">
+      <h3 class="flex items-center text-xl font-semibold text-gray-700">
+        <iconify-icon icon="heroicons-outline:document-text" class="w-5 h-5 mr-2 text-indigo-600" />
+        Pages
+      </h3>
+      <button
+        type="button"
+        onclick="document.dispatchEvent(new Event('open-new-page-modal'))"
+        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+      >
+        <iconify-icon icon="heroicons-outline:plus" class="w-4 h-4 mr-2" />
+        New Page
+      </button>
+    </div>
+
+    <!-- Pages Grid with Drag and Drop -->
+    <div id="pages-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {pages.rows.map((page) => {
+        // Ensure page slug is a valid string before creating the link
+        const safeSlug = typeof page.slug === 'string' && page.slug !== '[object Object]' 
+          ? page.slug 
+          : page.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        
+        return (
+          <div
+            class="relative bg-white p-6 rounded-lg shadow hover:shadow-md transition cursor-grab"
+            draggable="true"
+            data-id={page.id}
+          >
+            <div class="absolute top-3 left-3 text-gray-400 select-none pointer-events-none">☰</div>
+            <div class="absolute top-3 right-3 flex space-x-2 z-10">
+              <a
+                href={`/admin/pages/${safeSlug}`}
+                onclick="event.stopPropagation();"
+                class="text-gray-400 hover:text-indigo-600"
+                title="Edit Page"
+              >
+                <iconify-icon icon="heroicons-outline:pencil-square" class="w-5 h-5" />
+              </a>
+              <button
+                onclick={`event.stopPropagation(); document.dispatchEvent(new CustomEvent('open-delete-page-modal', { detail: { id: ${page.id}, name: '${page.name}' } }))`}
+                class="text-gray-400 hover:text-red-600 text-xl font-bold focus:outline-none"
+                title="Delete Page"
+              >
+                &times;
+              </button>
+            </div>
+            {/* @ts-ignore */}
+            <h4 class="text-xl font-semibold mb-2">{page.name}</h4>
+            <span class="text-indigo-600 font-medium">Drag to reorder</span>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <NewPageModal />
+  <DeletePageHandler />
+  <DeletePageModal />
+
+  <script type="module" is:inline>
+    const grid = document.getElementById('pages-grid');
+    let dragged;
+
+    grid.addEventListener('dragstart', (e) => {
+      if (!e.target.closest('[data-id]')) return;
+      dragged = e.target.closest('[data-id]');
+      dragged.classList.add('opacity-50');
+    });
+
+    grid.addEventListener('dragend', () => {
+      if (dragged) dragged.classList.remove('opacity-50');
+    });
+
+    grid.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const target = e.target.closest('[data-id]');
+      if (!dragged || !target || target === dragged) return;
+
+      const bounding = target.getBoundingClientRect();
+      const offset = bounding.y + bounding.height / 2;
+      if (e.clientY > offset && target.nextSibling !== dragged) {
+        target.after(dragged);
+      } else if (e.clientY <= offset && target.previousSibling !== dragged) {
+        target.before(dragged);
+      }
+    });
+
+    grid.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      const order = [...grid.children].map(el => el.getAttribute('data-id'));
+
+      await fetch('/api/admin/update-page-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+      });
+    });
+  </script>
+</Layout>

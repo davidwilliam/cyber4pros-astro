@@ -2,13 +2,18 @@
   "extends": "astro/tsconfigs/strict",
   "include": [
     ".astro/types.d.ts",
+    "src/types.d.ts",
     "**/*"
   ],
   "exclude": [
-    "dist"
+    "dist",
+    "src/components/common/Analytics.astro",
+    "src/components/common/SiteVerification.astro",
+    "src/components/common/SplitbeeAnalytics.astro",
+    "src/components/widgets/Steps.astro"
   ],
   "compilerOptions": {
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "jsxImportSource": "react",
     "baseUrl": ".",
     "paths": {

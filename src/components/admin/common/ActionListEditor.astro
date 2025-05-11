@@ -1,0 +1,317 @@
+---
+// Define interfaces for TypeScript
+export interface Action {
+  text: string;
+  href: string;
+  variant: string;
+}
+
+export interface RouteOption {
+  label: string;
+  path: string;
+}
+
+export interface Props {
+  actions?: Action[];
+  availableRoutes?: RouteOption[];
+  onChange?: Function;
+}
+
+const { actions = [], availableRoutes = [] } = Astro.props;
+
+// Map routes to options format
+const routeOptions = [
+  { label: 'Select route', value: '' }, 
+  ...availableRoutes.map((r: RouteOption) => ({ 
+    label: r.label, 
+    value: r.path 
+  }))
+];
+---
+
+<div class="space-y-4" id="action-list-editor">
+  {actions.length === 0 && (
+    <p class="text-sm text-gray-500 italic">No actions yet. Add your first action below.</p>
+  )}
+  
+  <div id="actions-container">
+    {actions.map((action, index) => (
+      <div class="flex flex-col sm:flex-row sm:items-end sm:space-x-4 border p-3 rounded mb-3 action-item" data-index={index}>
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700">Label</label>
+          <input
+            type="text"
+            value={action.text}
+            class="w-full border p-2 rounded action-text"
+            data-index={index}
+          />
+        </div>
+        
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700">URL</label>
+          <select
+            class="w-full border p-2 rounded action-href"
+            data-index={index}
+          >
+            {routeOptions.map(option => (
+              <option 
+                value={option.value} 
+                selected={action.href === option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Style</label>
+          <select
+            class="w-full border p-2 rounded action-variant"
+            data-index={index}
+          >
+            <option value="primary" selected={action.variant === 'primary'}>Primary</option>
+            <option value="outline" selected={action.variant === 'outline'}>Outline</option>
+          </select>
+        </div>
+        
+        <button
+          type="button"
+          class="text-red-600 text-sm ml-2 mt-auto remove-action"
+          data-index={index}
+        >
+          Remove
+        </button>
+      </div>
+    ))}
+  </div>
+  
+  <button
+    type="button"
+    id="add-action-btn"
+    class="text-indigo-600 text-sm hover:underline"
+  >
+    + Add action
+  </button>
+</div>
+
+<script>
+// This script will execute when the component is used directly
+// It sets up a basic API for the component when used standalone
+document.addEventListener('DOMContentLoaded', () => {
+  const actionsContainer = document.getElementById('actions-container');
+  const addActionBtn = document.getElementById('add-action-btn');
+  
+  if (addActionBtn && actionsContainer) {
+    addActionBtn.addEventListener('click', () => {
+      // Dispatch a custom event that parent components can listen for
+      const event = new CustomEvent('action:add', {
+        bubbles: true,
+        detail: { type: 'add' }
+      });
+      addActionBtn.dispatchEvent(event);
+    });
+    
+    // Setup delegation for remove buttons
+    actionsContainer.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target && target.classList.contains('remove-action')) {
+        const index = target.dataset.index;
+        if (index) {
+          // Dispatch a custom event that parent components can listen for
+          const event = new CustomEvent('action:remove', {
+            bubbles: true,
+            detail: { type: 'remove', index: parseInt(index, 10) }
+          });
+          target.dispatchEvent(event);
+        }
+      }
+    });
+    
+    // Setup delegation for inputs/selects
+    actionsContainer.addEventListener('input', (e) => {
+      const target = e.target as HTMLInputElement | HTMLSelectElement;
+      if (target && (
+        target.classList.contains('action-text') || 
+        target.classList.contains('action-href') || 
+        target.classList.contains('action-variant')
+      )) {
+        const index = target.dataset.index;
+        if (index) {
+          const field = target.classList.contains('action-text') ? 'text' :
+                      target.classList.contains('action-href') ? 'href' : 'variant';
+          const value = target.value;
+          
+          // Dispatch a custom event that parent components can listen for
+          const event = new CustomEvent('action:update', {
+            bubbles: true,
+            detail: { type: 'update', index: parseInt(index, 10), field, value }
+          });
+          target.dispatchEvent(event);
+        }
+      }
+    });
+  }
+});
+</script>
+
+<script define:vars={{ actions, routeOptions }}>
+// This is a helper component for direct use on client side
+export class ActionListEditorClient {
+  constructor(container, options = {}) {
+    this.container = typeof container === 'string' ? document.querySelector(container) : container;
+    this.actions = [...(options.actions || [])];
+    this.onChange = options.onChange || (() => {});
+    this.routeOptions = options.routeOptions || [];
+    
+    if (!this.container) {
+      console.error('ActionListEditor: Container element not found');
+      return;
+    }
+    
+    this.actionsContainer = this.container.querySelector('#actions-container');
+    this.addButton = this.container.querySelector('#add-action-btn');
+    
+    this.setupListeners();
+  }
+  
+  setupListeners() {
+    // Add button
+    if (this.addButton) {
+      this.addButton.addEventListener('click', () => this.addAction());
+    }
+    
+    // Event delegation for remove buttons and inputs
+    if (this.container) {
+      this.container.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-action')) {
+          const index = parseInt(e.target.dataset.index, 10);
+          this.removeAction(index);
+        }
+      });
+      
+      this.container.addEventListener('input', (e) => {
+        const target = e.target;
+        if (
+          target.classList.contains('action-text') || 
+          target.classList.contains('action-href') || 
+          target.classList.contains('action-variant')
+        ) {
+          const index = parseInt(target.dataset.index, 10);
+          const field = target.classList.contains('action-text') ? 'text' :
+                       target.classList.contains('action-href') ? 'href' : 'variant';
+          this.updateAction(index, field, target.value);
+        }
+      });
+      
+      // Listen for custom events
+      this.container.addEventListener('action:add', () => this.addAction());
+      this.container.addEventListener('action:remove', (e) => this.removeAction(e.detail.index));
+      this.container.addEventListener('action:update', (e) => {
+        this.updateAction(e.detail.index, e.detail.field, e.detail.value);
+      });
+    }
+  }
+  
+  addAction() {
+    this.actions = [...this.actions, { text: '', href: '', variant: 'primary' }];
+    this.render();
+    this.onChange(this.actions);
+  }
+  
+  removeAction(index) {
+    this.actions = this.actions.filter((_, i) => i !== index);
+    this.render();
+    this.onChange(this.actions);
+  }
+  
+  updateAction(index, field, value) {
+    this.actions = this.actions.map((action, i) => {
+      if (i === index) {
+        return { ...action, [field]: value };
+      }
+      return action;
+    });
+    this.onChange(this.actions);
+  }
+  
+  render() {
+    if (!this.actionsContainer) return;
+    
+    this.actionsContainer.innerHTML = '';
+    
+    if (this.actions.length === 0) {
+      const emptyMessage = document.createElement('p');
+      emptyMessage.className = 'text-sm text-gray-500 italic';
+      emptyMessage.textContent = 'No actions yet. Add your first action below.';
+      this.actionsContainer.appendChild(emptyMessage);
+      return;
+    }
+    
+    this.actions.forEach((action, index) => {
+      const actionItem = document.createElement('div');
+      actionItem.className = 'flex flex-col sm:flex-row sm:items-end sm:space-x-4 border p-3 rounded mb-3 action-item';
+      actionItem.dataset.index = index.toString();
+      
+      actionItem.innerHTML = `
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700">Label</label>
+          <input
+            type="text"
+            value="${action.text || ''}"
+            class="w-full border p-2 rounded action-text"
+            data-index="${index}"
+          />
+        </div>
+        
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700">URL</label>
+          <select
+            class="w-full border p-2 rounded action-href"
+            data-index="${index}"
+          >
+            ${this.routeOptions.map(option => `
+              <option 
+                value="${option.value}" 
+                ${action.href === option.value ? 'selected' : ''}
+              >
+                ${option.label}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Style</label>
+          <select
+            class="w-full border p-2 rounded action-variant"
+            data-index="${index}"
+          >
+            <option value="primary" ${action.variant === 'primary' ? 'selected' : ''}>Primary</option>
+            <option value="outline" ${action.variant === 'outline' ? 'selected' : ''}>Outline</option>
+          </select>
+        </div>
+        
+        <button
+          type="button"
+          class="text-red-600 text-sm ml-2 mt-auto remove-action"
+          data-index="${index}"
+        >
+          Remove
+        </button>
+      `;
+      
+      this.actionsContainer.appendChild(actionItem);
+    });
+  }
+  
+  getActions() {
+    return [...this.actions];
+  }
+  
+  setActions(actions) {
+    this.actions = [...actions];
+    this.render();
+  }
+}
+</script>

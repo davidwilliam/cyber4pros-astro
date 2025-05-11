@@ -1,8 +1,21 @@
 ---
-import Icon from 'astro-icon';
 import Logo from '~/components/Logo.astro';
 import ToggleMenu from '~/components/common/ToggleMenu.astro';
-import { getHomePermalink, trimSlash } from '~/utils/permalinks';
+
+export interface Link {
+  text: string;
+  href: string;
+}
+
+export interface Props {
+  id?: string;
+  links?: Link[];
+  isSticky?: boolean;
+  isDark?: boolean;
+  isFullWidth?: boolean;
+  showToggleTheme?: boolean;
+  session?: any;
+}
 
 const {
   id = 'header',
@@ -10,20 +23,20 @@ const {
   isSticky = false,
   isDark = false,
   isFullWidth = false,
-  showToggleTheme = false,
   session = null,
 } = Astro.props;
 
+// Get current path for active link highlighting
 const currentPath = new URL(Astro.url).pathname;
 ---
 
 <header
+  id={id}
   class:list={[
-    { sticky: isSticky, relative: !isSticky, dark: isDark },
     'top-0 z-40 flex-none mx-auto w-full border-b border-gray-50/0 transition-[opacity] ease-in-out',
+    { sticky: isSticky, relative: !isSticky, dark: isDark },
   ]}
-  {...(isSticky ? { 'data-aw-sticky-header': true } : {})}
-  {...(id ? { id } : {})}
+  data-aw-sticky-header={isSticky ? 'true' : 'false'}
 >
   <div class="absolute inset-0"></div>
   <div
@@ -32,7 +45,7 @@ const currentPath = new URL(Astro.url).pathname;
       { 'max-w-7xl': !isFullWidth },
     ]}
   >
-    <!-- Left: Logo and Toggle Menu -->
+    <!-- Left: Logo and mobile menu toggle -->
     <div class="flex items-center">
       <a class="flex items-center" href="/">
         <Logo />
@@ -42,7 +55,7 @@ const currentPath = new URL(Astro.url).pathname;
       </div>
     </div>
 
-    <!-- Center: Dynamic Navigation -->
+    <!-- Center: Navigation -->
     <nav class="hidden md:flex items-center flex-1 justify-center" aria-label="Main navigation">
       <ul class="flex flex-col md:flex-row text-xl md:text-[0.9375rem] tracking-[0.01rem] font-medium">
         {links.map(({ text, href }) => (
@@ -51,7 +64,7 @@ const currentPath = new URL(Astro.url).pathname;
               href={href}
               class:list={[
                 'hover:text-link dark:hover:text-white px-4 py-3 flex items-center whitespace-nowrap',
-                { 'aw-link-active': href === currentPath },
+                { 'aw-link-active': currentPath === href },
               ]}
             >
               {text}
@@ -61,7 +74,7 @@ const currentPath = new URL(Astro.url).pathname;
       </ul>
     </nav>
 
-    <!-- Right: Theme Toggle + Logout -->
+    <!-- Right: Logout -->
     <div class="flex items-center space-x-4">
       {session && (
         <form method="POST" action="/api/logout">

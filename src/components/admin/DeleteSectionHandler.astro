@@ -1,0 +1,15 @@
+---
+// This component serves as a client-side handler for delete section operations
+---
+
+<script>
+  // Listen for delete events and handle them
+  document.addEventListener('delete-section', (event) => {
+    if (event instanceof CustomEvent) {
+      const { id, type } = event.detail;
+      document.dispatchEvent(new CustomEvent('open-delete-section-modal', { 
+        detail: { id, type } 
+      }));
+    }
+  });
+</script>

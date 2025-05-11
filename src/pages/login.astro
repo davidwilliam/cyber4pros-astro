@@ -1,0 +1,130 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import Logo from '~/components/Logo.astro';
+
+const metadata = { title: 'Admin Sign In' };
+---
+
+<Layout {metadata}>
+  <section class="flex items-center justify-center min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="w-full max-w-md space-y-8 bg-white p-8 rounded-2xl shadow-xl">
+      <!-- Logo + Title -->
+      <div class="flex flex-col items-center">
+        <Logo class="w-12 h-12" />
+        <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
+          Admin Sign In
+        </h2>
+      </div>
+
+      <!-- Toast Notification -->
+      <div id="toast-container" class="fixed top-6 right-6 z-50 space-y-2"></div>
+
+      <!-- Form -->
+      <form id="login-form" class="mt-8 space-y-6">
+        <div class="rounded-md shadow-sm -space-y-px">
+          <div class="mb-4">
+            <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+            <input id="email" name="email" type="email" required class="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+          </div>
+          <div class="mb-4">
+            <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+            <input id="password" name="password" type="password" required class="mt-1 w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" />
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between mb-6 text-sm">
+          <label class="flex items-center">
+            <input name="remember" type="checkbox" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" />
+            <span class="ml-2 text-gray-700">Remember me</span>
+          </label>
+          <a href="/forgot-password" class="text-indigo-600 hover:underline">Forgot password?</a>
+        </div>
+
+        <div>
+          <button type="submit" class="w-full flex justify-center py-3 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500">
+            Sign In
+          </button>
+        </div>
+
+        <!-- E2E Notice -->
+        <div class="flex items-center justify-center mt-4 text-xs text-gray-500 space-x-1">
+          <iconify-icon icon="heroicons-outline:lock-closed" class="w-4 h-4" />
+          <span>End-to-end encrypted</span>
+        </div>
+      </form>
+
+      <div class="text-center text-xs text-gray-500">
+        <p>
+          By signing in, you agree to our
+          <a href="/terms" class="text-indigo-600 hover:underline">Terms of Service</a> and
+          <a href="/privacy" class="text-indigo-600 hover:underline">Privacy Policy</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <script type="module">
+    const form = document.getElementById('login-form');
+    const toastContainer = document.getElementById('toast-container');
+
+    function showToast(message, type = 'success') {
+      const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+      const toast = document.createElement('div');
+      toast.className = `${bgColor} text-white px-4 py-2 rounded shadow animate-fade-in-up`;
+      toast.innerText = message;
+      toastContainer.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 500);
+      }, 3000);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = form.email.value.trim();
+      const password = form.password.value.trim();
+      const remember = form.remember.checked ? 'true' : 'false';
+
+      if (!email || !password) {
+        showToast('Please enter both email and password.', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ email, password, remember }),
+        });
+
+        if (response.ok) {
+          showToast('Login successful!', 'success');
+          setTimeout(() => window.location.href = '/admin', 1000);
+        } else {
+          const { error } = await response.json();
+          showToast(error || 'Invalid credentials.', 'error');
+        }
+      } catch (err) {
+        showToast('Something went wrong.', 'error');
+        console.error(err);
+      }
+    });
+  </script>
+
+  <style>
+    @keyframes fade-in-up {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-fade-in-up {
+      animation: fade-in-up 0.5s ease-out;
+    }
+  </style>
+</Layout>

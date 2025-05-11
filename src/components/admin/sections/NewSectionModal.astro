@@ -1,0 +1,187 @@
+---
+// Define props interface
+export interface Props {
+  pageId: string | number;
+}
+
+const { pageId } = Astro.props;
+
+// Define section types
+const SECTION_TYPES = [
+  { label: 'Hero', value: 'hero' },
+  { label: 'Features', value: 'features' },
+  { label: 'Bullets', value: 'bullets' },
+  { label: 'Team', value: 'team' },
+  { label: 'Call to Action', value: 'cta' },
+  { label: 'Numbers', value: 'numbers' },
+  { label: 'Features3', value: 'features3' },
+  { label: 'Numbered List', value: 'numberedList' },
+  { label: 'Small Card', value: 'smallCard' },
+  { label: 'Large Card', value: 'largeCard' },
+  { label: 'Text Blocks', value: 'textBlocks' },
+  { label: 'Form', value: 'form' },
+];
+---
+
+<!-- Initially hidden modal -->
+<div id="new-section-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+    <h2 class="text-xl font-semibold mb-4">Create New Section</h2>
+
+    <label class="block text-sm font-medium text-gray-700 mb-2">Select section type</label>
+    <select
+      id="section-type-select"
+      class="w-full border p-2 rounded mb-4"
+    >
+      <option value="">Choose...</option>
+      {SECTION_TYPES.map((opt) => (
+        <option value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+
+    <div class="flex justify-end gap-2">
+      <button
+        id="cancel-button"
+        class="px-4 py-2 text-gray-600 hover:text-black"
+      >
+        Cancel
+      </button>
+      <button
+        id="create-button"
+        class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        Create
+      </button>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ pageId }}>
+  // State management
+  let isOpen = false;
+  let sectionType = '';
+  
+  // DOM Elements
+  const modal = document.getElementById('new-section-modal');
+  const selectElement = document.getElementById('section-type-select');
+  const createButton = document.getElementById('create-button');
+  const cancelButton = document.getElementById('cancel-button');
+  
+  // Set up event listeners
+  document.addEventListener('open-new-section-modal', () => {
+    openModal();
+  });
+  
+  if (selectElement) {
+    selectElement.addEventListener('change', (e) => {
+      sectionType = e.target.value;
+      if (createButton) {
+        createButton.disabled = !sectionType;
+      }
+    });
+  }
+  
+  if (cancelButton) {
+    cancelButton.addEventListener('click', () => {
+      closeModal();
+    });
+  }
+  
+  if (createButton) {
+    createButton.addEventListener('click', () => {
+      handleCreate();
+    });
+  }
+  
+  // Modal handlers
+  function openModal() {
+    if (modal) {
+      modal.classList.remove('hidden');
+      isOpen = true;
+    }
+  }
+  
+  function closeModal() {
+    if (modal) {
+      modal.classList.add('hidden');
+      isOpen = false;
+      if (selectElement) {
+        selectElement.value = '';
+        sectionType = '';
+      }
+      if (createButton) {
+        createButton.disabled = true;
+      }
+    }
+  }
+  
+  // Utility function to show toast notifications
+  function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
+    
+    // If no toast container found, skip showing toast to avoid errors
+    if (!toastContainer) {
+      console.warn('Toast container not found, cannot show toast');
+      return;
+    }
+    
+    // Clear existing toasts to avoid duplicates
+    toastContainer.innerHTML = '';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const toast = document.createElement('div');
+    toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+    toast.innerText = message;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('opacity-0');
+      setTimeout(() => toast.remove(), 500);
+    }, 3000);
+  }
+  
+  // API handlers
+  async function handleCreate() {
+    if (!sectionType) return;
+    
+    if (createButton) {
+      createButton.disabled = true;
+      createButton.textContent = 'Creating...';
+    }
+    
+    try {
+      console.log('Creating new section with:', { type: sectionType, pageId: pageId });
+      
+      const res = await fetch(`/api/sections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          type: sectionType, 
+          pageId: pageId 
+        }),
+      });
+      
+      if (res.ok) {
+        showToast('Section created successfully!', 'success');
+        window.location.reload();
+      } else {
+        const errorData = await res.json();
+        console.error('Error response:', errorData);
+        showToast(errorData.error || 'Failed to create section', 'error');
+        if (createButton) {
+          createButton.disabled = false;
+          createButton.textContent = 'Create';
+        }
+      }
+    } catch (error) {
+      console.error('Error creating section:', error);
+      showToast('Failed to create section', 'error');
+      if (createButton) {
+        createButton.disabled = false;
+        createButton.textContent = 'Create';
+      }
+    }
+  }
+</script>

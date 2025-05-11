@@ -1,0 +1,157 @@
+---
+export const prerender = false;
+
+import Layout from '~/layouts/PageLayout.astro';
+import HeroEditorSection from '~/components/admin/sections/HeroEditorSection.astro';
+import FeaturesEditorSection from '~/components/admin/sections/FeaturesEditorSection.astro';
+import BulletsEditorSection from '~/components/admin/sections/BulletsEditorSection.astro';
+import TeamEditorSection from '~/components/admin/sections/TeamEditorSection.astro';
+import CallToActionEditorSection from '~/components/admin/sections/CallToActionEditorSection.astro';
+import NewSectionModal from '~/components/admin/sections/NewSectionModal.astro';
+import NumbersEditorSection from '~/components/admin/sections/NumbersEditorSection.astro';
+import Features3EditorSection from '~/components/admin/sections/Features3EditorSection.astro';
+import NumberedListEditorSection from '~/components/admin/sections/NumberedListEditorSection.astro';
+import SmallCardEditorSection from '~/components/admin/sections/SmallCardEditorSection.astro';
+import LargeCardEditorSection from '~/components/admin/sections/LargeCardEditorSection.astro';
+import TextBlockEditorSection from '~/components/admin/sections/TextBlockEditorSection.astro';
+import FormEditorSection from '~/components/admin/sections/FormEditorSection.astro';
+import DeleteSectionHandler from '~/components/admin/DeleteSectionHandler.astro';
+import DeleteSectionModal from '~/components/admin/DeleteSectionModal.astro';
+
+import { getSession } from '~/utils/auth';
+import { db } from '~/utils/db';
+
+const session = getSession(Astro.request.headers);
+if (!session) {
+  console.log('No valid session found, redirecting to login');
+  return Astro.redirect('/login');
+}
+console.log(`Session found for user: ${session.username || session.email || 'Unknown user'}`);
+
+// Dump full object for debugging
+console.log('Full Astro.params object:', JSON.stringify(Astro.params));
+
+// Extract slug from URL properly
+const url = new URL(Astro.request.url);
+const pathParts = url.pathname.split('/');
+const rawUrlSlug = decodeURIComponent(pathParts[pathParts.length - 1]);
+console.log('URL path parts:', pathParts);
+console.log('Raw URL slug:', rawUrlSlug);
+
+// Check if slug is valid, if not use a fallback
+let useSlug = rawUrlSlug;
+let needsRedirect = false;
+
+if (rawUrlSlug === "[object Object]" || !rawUrlSlug) {
+  needsRedirect = true;
+  // Try to fetch the first page as fallback
+  try {
+    console.log("Got invalid slug, trying to find first page as fallback");
+    const firstPage = await db.query(`SELECT slug FROM pages ORDER BY sort_order ASC LIMIT 1`);
+    if (firstPage.rows.length > 0) {
+      useSlug = firstPage.rows[0].slug;
+      console.log(`Using first page slug as fallback: ${useSlug}`);
+    }
+  } catch (err) {
+    console.error("Failed to get fallback page:", err);
+  }
+}
+
+console.log('Final slug to use:', useSlug);
+
+let pageData;
+let sections;
+
+try {
+  console.log(`Loading page with slug: ${useSlug}`);
+  
+  const result = await db.query(`SELECT * FROM pages WHERE slug = $1`, [useSlug]);
+  console.log(`Query result:`, { rowCount: result.rowCount, hasRows: result.rows?.length > 0 });
+  
+  if (!result.rows.length) {
+    console.error(`No page found with slug: ${useSlug}`);
+    throw new Error('Page not found');
+  }
+  
+  pageData = result.rows[0];
+  console.log(`Found page: ${pageData.name} (ID: ${pageData.id})`);
+  
+  sections = await db.query(`SELECT * FROM sections WHERE page_id = $1 ORDER BY "order"`, [pageData.id]);
+  console.log(`Loaded ${sections.rows.length} sections for page ${pageData.name}`);
+  
+  // If we had an invalid slug, redirect to the correct URL with a valid slug
+  if (needsRedirect && typeof pageData.slug === 'string') {
+    console.log(`Redirecting from invalid slug to valid slug: ${pageData.slug}`);
+    return Astro.redirect(`/admin/pages/${pageData.slug}`);
+  }
+} catch (error) {
+  console.error(`Error loading page ${useSlug}:`, error);
+  throw error;
+}
+
+---
+<Layout metadata={{ title: `Edit Page — ${pageData.name}` }}>
+  <section class="max-w-5xl mx-auto py-12 px-4">
+    <div class="flex justify-between items-center mb-10">
+      <div>
+        <h1 class="text-3xl font-bold">Editing: {pageData.name}</h1>
+        <p class="text-gray-500 text-sm">Slug: {pageData.slug}</p>
+      </div>
+      <div class="flex gap-3">
+        <a
+          href="/admin"
+          class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition"
+        >
+          ← Back to Dashboard
+        </a>
+        <a
+          href={`/admin/pages/${pageData.slug}/preview`}
+          target="_blank"
+          class="inline-flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+        >
+          Preview
+        </a>
+        <button
+          type="button"
+          onclick="document.dispatchEvent(new Event('open-new-section-modal'))"
+          class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+        >
+          + New Section
+        </button>
+      </div>
+    </div>
+
+    {sections.rows.length === 0 ? (
+      <p class="text-gray-500">No sections yet. Add your first section!</p>
+    ) : (
+      sections.rows.map((section) => (
+        <div class="mb-12 relative">
+          <button
+            onclick={`document.dispatchEvent(new CustomEvent('open-delete-section-modal', { detail: { id: ${section.id}, type: '${section.type}' } }))`}
+            class="absolute top-3 right-3 text-gray-400 hover:text-red-600 text-xl font-bold focus:outline-none"
+            title="Delete Section"
+          >
+            &times;
+          </button>
+
+          {section.type === 'hero' && <HeroEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'features' && <FeaturesEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'bullets' && <BulletsEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'team' && <TeamEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'cta' && <CallToActionEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'numbers' && <NumbersEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'features3' && <Features3EditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'numberedList' && <NumberedListEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'smallCard' && <SmallCardEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'largeCard' && <LargeCardEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'textBlocks' && <TextBlockEditorSection data={{ ...section.data, id: section.id }} />}
+          {section.type === 'form' && <FormEditorSection data={{ ...section.data, id: section.id }} />}
+        </div>
+      ))
+    )}
+  </section>
+
+  <NewSectionModal pageId={pageData.id} />
+  <DeleteSectionHandler />
+  <DeleteSectionModal />
+</Layout>

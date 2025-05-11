@@ -1,0 +1,92 @@
+---
+export interface ImageProps {
+  src?: string;
+  alt?: string;
+}
+
+export interface ImageUploaderProps {
+  image?: ImageProps;
+  onChange?: (image: ImageProps) => void;
+}
+
+const { image, onChange } = Astro.props as ImageUploaderProps;
+---
+
+<div class="space-y-3">
+  <label class="block text-sm font-medium text-gray-700">Upload Image</label>
+  <input
+    id="file-input"
+    type="file"
+    accept="image/*"
+    class="block"
+  />
+  {image?.src && (
+    <>
+      <label class="block text-sm font-medium text-gray-700">Image Preview</label>
+      <img src={image.src} alt={image.alt} class="rounded border w-full max-w-md" />
+    </>
+  )}
+</div>
+
+<script>
+interface ImageProps {
+  src: string;
+  alt: string;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.getElementById('file-input') as HTMLInputElement;
+  
+  if (fileInput) {
+    fileInput.addEventListener('change', async (event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (!file) return;
+      
+      try {
+        const res = await fetch('/api/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, contentType: file.type }),
+        });
+        
+        const { uploadUrl, publicUrl } = await res.json();
+        
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        
+        // Dispatch a custom event to notify parent components
+        const uploadCompleteEvent = new CustomEvent('image-upload-complete', {
+          detail: { src: publicUrl, alt: file.name },
+          bubbles: true
+        });
+        fileInput.dispatchEvent(uploadCompleteEvent);
+        
+      } catch (error) {
+        console.error('Image upload failed:', error);
+        
+        // Dispatch error event
+        const uploadErrorEvent = new CustomEvent('image-upload-error', {
+          detail: { error },
+          bubbles: true
+        });
+        fileInput.dispatchEvent(uploadErrorEvent);
+      }
+    });
+  }
+});
+</script>
+
+<script define:vars={{ onChange }}>
+// Connect the component to any parent component that passes an onChange prop
+if (typeof onChange === 'function') {
+  document.addEventListener('image-upload-complete', (event) => {
+    if (event instanceof CustomEvent) {
+      onChange(event.detail);
+    }
+  });
+}
+</script>

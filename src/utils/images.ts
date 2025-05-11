@@ -1,5 +1,4 @@
 // src/utils/images.ts
-import { isUnpicCompatible } from './images-optimization';
 
 export type ImageProps = {
   url: string;

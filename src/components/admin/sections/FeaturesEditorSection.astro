@@ -1,0 +1,600 @@
+---
+// No need for FormControls or utils/editor imports since we're using direct approach
+interface Feature {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+export interface Props {
+  data: {
+    id: string;
+    tagline?: string;
+    title?: string;
+    subtitle?: string;
+    features?: Feature[];
+  };
+}
+
+const { data } = Astro.props;
+
+// Make sure data has default values
+const safeData = {
+  id: data.id,
+  tagline: data.tagline || '',
+  title: data.title || '',
+  subtitle: data.subtitle || '',
+  features: Array.isArray(data.features) ? data.features : []
+};
+
+console.log('Features data:', safeData);
+
+const AVAILABLE_ICONS = [
+  'lucide:shield', 'lucide:cpu', 'lucide:scan-face', 'lucide:atom', 'lucide:leaf',
+  'lucide:lock', 'lucide:server', 'lucide:radar', 'lucide:database', 'lucide:globe',
+  'lucide:satellite', 'lucide:bug', 'lucide:antenna', 'lucide:network', 'lucide:key',
+  'lucide:eye', 'lucide:alert-circle', 'lucide:activity', 'lucide:terminal', 'lucide:cloud'
+];
+---
+
+<section id={data.id} class="border p-6 rounded-lg shadow bg-white space-y-4">
+  <h2 class="text-xl font-semibold mb-4">Highlights</h2>
+  
+  <!-- Tab navigation -->
+  <div class="flex border-b mb-4">
+    <button type="button" class="tab-btn pb-2 border-b-2 border-indigo-600 font-medium px-4" data-tab="content">Content</button>
+    <button type="button" class="tab-btn pb-2 text-gray-500 px-4" data-tab="features">Features</button>
+  </div>
+
+  <!-- Content tab - Always visible initially -->
+  <div id="content-tab" class="tab-content space-y-4" style="display: none;">
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Tagline</label>
+      <input 
+        type="text" 
+        id="tagline-input"
+        value={safeData.tagline} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Title</label>
+      <input 
+        type="text" 
+        id="title-input"
+        value={safeData.title} 
+        class="w-full border p-2 rounded"
+      />
+    </div>
+    
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700">Subtitle</label>
+      <textarea
+        id="subtitle-input" 
+        rows="3" 
+        class="w-full border p-2 rounded"
+      >{safeData.subtitle}</textarea>
+    </div>
+  </div>
+
+  <!-- Features tab - Hidden initially -->
+  <div id="features-tab" class="tab-content space-y-4" style="display: none;">
+    <div id="features-container">
+      {safeData.features.map((feature, index) => (
+        <div class="border p-4 rounded space-y-3 bg-gray-50 mb-4" data-index={index}>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Select Icon</label>
+            <div class="grid grid-cols-10 gap-2 icon-selector" data-index={index}>
+              {AVAILABLE_ICONS.map((iconName) => (
+                <button
+                  type="button"
+                  data-icon={iconName}
+                  data-feature-index={index}
+                  class={`border rounded p-2 flex items-center justify-center icon-btn ${
+                    feature.icon === iconName ? 'bg-indigo-600 text-white border-indigo-600' : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <span class="icon" data-icon={iconName}></span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Title</label>
+            <input
+              type="text"
+              value={feature.title || ''}
+              class="w-full border p-2 rounded feature-title"
+              data-index={index}
+            />
+          </div>
+          
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              rows="2"
+              class="w-full border p-2 rounded feature-description"
+              data-index={index}
+            >{feature.description || ''}</textarea>
+          </div>
+          
+          <div class="text-right">
+            <button
+              type="button"
+              class="text-red-600 text-sm hover:underline"
+              data-action="remove-feature"
+              data-index={index}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+    
+    <button
+      type="button"
+      id="add-feature-btn"
+      class="text-indigo-600 text-sm hover:underline"
+    >
+      + Add feature
+    </button>
+  </div>
+
+  <div class="pt-6 border-t">
+    <button
+      type="button"
+      id="save-button"
+      class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+    >
+      Save Changes
+    </button>
+  </div>
+</section>
+
+<!-- Toast container for notifications -->
+<div id="toast-container" class="fixed top-4 right-4 z-50"></div>
+
+<!-- Iconify for icons -->
+<script src="https://code.iconify.design/3/3.1.0/iconify.min.js" is:inline></script>
+
+<script is:inline define:vars={{ safeData, AVAILABLE_ICONS }}>
+  console.log('FeaturesEditorSection script starting with data:', safeData);
+  
+  // State management
+  let formState = { ...safeData };
+  let activeTab = 'content'; // Default active tab
+  let tabButtons, tabContents, taglineInput, titleInput, subtitleInput,
+      featuresContainer, addFeatureBtn, saveButton;
+  
+  /**
+   * Show a toast notification
+   * @param {string} message - The message to display
+   * @param {'success' | 'error'} [type='success'] - The type of toast
+   */
+  function showToast(message, type = 'success') {
+    const toastContainer = document.getElementById('toast-container');
+    
+    // If no toast container found, skip showing toast to avoid errors
+    if (!toastContainer) {
+      console.warn('Toast container not found, cannot show toast');
+      return;
+    }
+    
+    // Clear existing toasts to avoid duplicates
+    toastContainer.innerHTML = '';
+    
+    const bgColor = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+    const toast = document.createElement('div');
+    toast.className = `${bgColor} text-white px-4 py-2 rounded shadow`;
+    toast.innerText = message;
+    
+    toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('opacity-0');
+      setTimeout(() => toast.remove(), 500);
+    }, 3000);
+  }
+  
+  // Setup all DOM elements after the page loads
+  function setupDomElements() {
+    tabButtons = document.querySelectorAll('.tab-btn');
+    tabContents = document.querySelectorAll('.tab-content');
+    taglineInput = document.getElementById('tagline-input');
+    titleInput = document.getElementById('title-input');
+    subtitleInput = document.getElementById('subtitle-input');
+    featuresContainer = document.getElementById('features-container');
+    addFeatureBtn = document.getElementById('add-feature-btn');
+    saveButton = document.getElementById('save-button');
+    
+    // Setup iconify
+    document.querySelectorAll('.icon').forEach(icon => {
+      const iconName = icon.getAttribute('data-icon');
+      if (iconName) {
+        icon.innerHTML = `<span class="iconify" data-icon="${iconName}"></span>`;
+      }
+    });
+  }
+  
+  // Initialize
+  function init() {
+    console.log('Initializing FeaturesEditorSection with form state:', formState);
+    setupDomElements();
+    
+    // Set "content" as the default active tab
+    setActiveTab('content'); 
+
+    // Add event listeners to tab buttons
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.getAttribute('data-tab');
+        console.log('Tab clicked:', tabName);
+        
+        // Update tab button styles
+        tabButtons.forEach(b => {
+          if (b.getAttribute('data-tab') === tabName) {
+            b.classList.add('border-b-2', 'border-indigo-600', 'font-semibold');
+            b.classList.remove('text-gray-500');
+          } else {
+            b.classList.remove('border-b-2', 'border-indigo-600', 'font-semibold');
+            b.classList.add('text-gray-500');
+          }
+        });
+        
+        // Show/hide tab contents
+        tabContents.forEach(content => {
+          const contentId = content.id;
+          if (contentId === `${tabName}-tab`) {
+            content.style.display = 'block';
+          } else {
+            content.style.display = 'none';
+          }
+        });
+      });
+    });
+    
+    // Input fields for content tab
+    if (taglineInput) {
+      console.log('Attaching listener to taglineInput:', taglineInput);
+      taglineInput.addEventListener('input', (e) => {
+        formState.tagline = e.target.value;
+        console.log('Tagline updated in formState:', formState.tagline);
+      });
+    } else {
+      console.warn('Tagline input not found for event listener attachment');
+    }
+    
+    if (titleInput) {
+      console.log('Attaching listener to titleInput:', titleInput);
+      titleInput.addEventListener('input', (e) => {
+        formState.title = e.target.value;
+        console.log('Title updated in formState:', formState.title);
+      });
+    } else {
+      console.warn('Title input not found for event listener attachment');
+    }
+    
+    if (subtitleInput) {
+      console.log('Attaching listener to subtitleInput:', subtitleInput);
+      subtitleInput.addEventListener('input', (e) => {
+        formState.subtitle = e.target.value;
+        console.log('Subtitle updated in formState:', formState.subtitle);
+      });
+    } else {
+      console.warn('Subtitle input not found for event listener attachment');
+    }
+    
+    // Feature inputs
+    setupFeatureListeners();
+    
+    // Add feature button
+    if (addFeatureBtn) {
+      addFeatureBtn.addEventListener('click', addFeature);
+    }
+    
+    // Save button
+    if (saveButton) {
+      console.log('Attaching click listener to saveButton:', saveButton);
+      saveButton.addEventListener('click', handleSave);
+    } else {
+      console.warn('Save button not found in init, cannot attach listener');
+    }
+  }
+  
+  // Setup feature event listeners
+  function setupFeatureListeners() {
+    if (!featuresContainer) return;
+    
+    // Title inputs
+    featuresContainer.querySelectorAll('.feature-title').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        if (!formState.features[index]) formState.features[index] = {};
+        formState.features[index].title = e.target.value;
+        console.log(`Feature ${index} title updated:`, e.target.value);
+      });
+    });
+    
+    // Description inputs
+    featuresContainer.querySelectorAll('.feature-description').forEach(textarea => {
+      textarea.addEventListener('input', (e) => {
+        const index = parseInt(e.target.getAttribute('data-index'), 10);
+        if (!formState.features[index]) formState.features[index] = {};
+        formState.features[index].description = e.target.value;
+        console.log(`Feature ${index} description updated:`, e.target.value);
+      });
+    });
+    
+    // Icon buttons
+    featuresContainer.querySelectorAll('.icon-btn').forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const iconName = button.getAttribute('data-icon');
+        const index = parseInt(button.getAttribute('data-feature-index'), 10);
+        
+        // Reset buttons in this container
+        const container = button.closest('.icon-selector');
+        if (container) {
+          container.querySelectorAll('.icon-btn').forEach(btn => {
+            btn.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600');
+            btn.classList.add('hover:bg-gray-100');
+          });
+        }
+        
+        // Highlight this button
+        button.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600');
+        button.classList.remove('hover:bg-gray-100');
+        
+        // Update state
+        if (!formState.features[index]) formState.features[index] = {};
+        formState.features[index].icon = iconName;
+        console.log(`Feature ${index} icon updated:`, iconName);
+      });
+    });
+    
+    // Remove buttons
+    featuresContainer.querySelectorAll('[data-action="remove-feature"]').forEach(button => {
+      button.addEventListener('click', (e) => {
+        const index = parseInt(button.getAttribute('data-index'), 10);
+        formState.features = formState.features.filter((_, i) => i !== index);
+        
+        // Remove from DOM
+        const feature = button.closest('[data-index]');
+        if (feature && feature.parentNode) {
+          feature.parentNode.removeChild(feature);
+        }
+        
+        // Reindex remaining features
+        Array.from(featuresContainer.children).forEach((feature, idx) => {
+          feature.setAttribute('data-index', idx);
+          
+          feature.querySelectorAll('[data-index]').forEach(el => {
+            el.setAttribute('data-index', idx);
+          });
+          
+          feature.querySelectorAll('[data-feature-index]').forEach(el => {
+            el.setAttribute('data-feature-index', idx);
+          });
+        });
+      });
+    });
+  }
+  
+  // Add a new feature
+  function addFeature() {
+    const newIndex = formState.features.length;
+    formState.features.push({ icon: '', title: '', description: '' });
+    
+    const featureDiv = document.createElement('div');
+    featureDiv.className = 'border p-4 rounded space-y-3 bg-gray-50 mb-4';
+    featureDiv.setAttribute('data-index', newIndex);
+    
+    const iconsHTML = AVAILABLE_ICONS.map(icon => 
+      `<button
+        type="button"
+        data-icon="${icon}"
+        data-feature-index="${newIndex}"
+        class="border rounded p-2 flex items-center justify-center icon-btn hover:bg-gray-100"
+      >
+        <span class="icon" data-icon="${icon}"></span>
+      </button>`
+    ).join('');
+    
+    featureDiv.innerHTML = `
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Select Icon</label>
+        <div class="grid grid-cols-10 gap-2 icon-selector" data-index="${newIndex}">${iconsHTML}</div>
+      </div>
+      
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700">Title</label>
+        <input
+          type="text"
+          value=""
+          class="w-full border p-2 rounded feature-title"
+          data-index="${newIndex}"
+        />
+      </div>
+      
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700">Description</label>
+        <textarea
+          rows="2"
+          class="w-full border p-2 rounded feature-description"
+          data-index="${newIndex}"
+        ></textarea>
+      </div>
+      
+      <div class="text-right">
+        <button
+          type="button"
+          class="text-red-600 text-sm hover:underline"
+          data-action="remove-feature"
+          data-index="${newIndex}"
+        >
+          Remove
+        </button>
+      </div>
+    `;
+    
+    featuresContainer.appendChild(featureDiv);
+    
+    // Init iconify on new elements
+    featureDiv.querySelectorAll('.icon').forEach(icon => {
+      const iconName = icon.getAttribute('data-icon');
+      if (iconName) {
+        icon.innerHTML = `<span class="iconify" data-icon="${iconName}"></span>`;
+      }
+    });
+    
+    // Setup event listeners on new elements
+    setupFeatureListeners();
+  }
+  
+  // Handle save button click
+  function handleSave(e) {
+    e.preventDefault();
+    
+    console.log('Save button clicked');
+    
+    if (this.disabled) {
+      console.log('Save button is disabled, ignoring click');
+      return;
+    }
+    
+    const button = this;
+    button.disabled = true;
+    button.textContent = 'Saving...';
+    
+    // Get the latest values directly from the DOM for top-level fields
+    const currentTagline = document.getElementById('tagline-input')?.value || '';
+    const currentTitle = document.getElementById('title-input')?.value || '';
+    const currentSubtitle = document.getElementById('subtitle-input')?.value || '';
+    
+    console.log('Current form values (top-level):');
+    console.log('- tagline:', currentTagline);
+    console.log('- title:', currentTitle);
+    console.log('- subtitle:', currentSubtitle);
+
+    // Read features directly from DOM
+    const currentFeatures = [];
+    if (featuresContainer) {
+        const featureElements = featuresContainer.querySelectorAll('[data-index]');
+        featureElements.forEach(featureEl => {
+            const index = parseInt(featureEl.getAttribute('data-index'), 10);
+            if (isNaN(index)) return;
+            
+            const titleInput = featureEl.querySelector('.feature-title');
+            const descInput = featureEl.querySelector('.feature-description');
+            const selectedIconBtn = featureEl.querySelector('.icon-btn.bg-indigo-600');
+            
+            currentFeatures[index] = {
+                icon: selectedIconBtn ? selectedIconBtn.getAttribute('data-icon') || '' : '',
+                title: titleInput?.value || '',
+                description: descInput?.value || ''
+            };
+            console.log(`Feature ${index} from DOM for save:`, currentFeatures[index]);
+        });
+    }
+    
+    // Construct the data object to be sent
+    const dataToSend = {
+        id: formState.id, // Persist original ID
+        tagline: currentTagline,
+        title: currentTitle,
+        subtitle: currentSubtitle,
+        features: currentFeatures.filter(Boolean) // Ensure no empty/null items if array was sparse
+    };
+    
+    // This immediate async function is fine
+    (async () => {
+      try {
+        console.log('Submitting this data to server:', JSON.stringify(dataToSend, null, 2));
+                
+        const response = await fetch(`/api/sections/${dataToSend.id}`, { // Use ID from dataToSend for consistency
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSend) // Send the freshly constructed dataToSend
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to save changes.';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+          
+          throw new Error(errorMessage);
+        }
+        
+        const result = await response.json();
+        console.log('Section saved successfully:', result);
+        showToast('Changes saved successfully!', 'success');
+        
+        // IMPORTANT: Update formState with the successfully saved data
+        // This ensures that if the user continues editing without a page reload,
+        // the state reflects what's on the server.
+        formState = { ...formState, ...dataToSend }; 
+        console.log('formState updated after successful save:', formState);
+
+      } catch (err) {
+        console.error('Save error:', err);
+        showToast(err.message || 'Failed to save changes.', 'error');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Changes';
+      }
+    })();
+  }
+  
+  // Set active tab
+  function setActiveTab(tabId) {
+    console.log('Setting active tab to:', tabId);
+    activeTab = tabId; // Assuming activeTab is a global/module-scoped variable if needed elsewhere
+    
+    // Update tab button styles
+    tabButtons.forEach(btn => {
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('border-b-2', 'border-indigo-600', 'font-semibold');
+        btn.classList.remove('text-gray-500');
+      } else {
+        btn.classList.remove('border-b-2', 'border-indigo-600', 'font-semibold');
+        btn.classList.add('text-gray-500');
+      }
+    });
+    
+    // Show/hide tab contents
+    tabContents.forEach(content => {
+      const contentId = content.id;
+      if (contentId === `${tabId}-tab`) {
+        content.style.display = 'block';
+        console.log('Showing tab content:', contentId);
+      } else {
+        content.style.display = 'none';
+        console.log('Hiding tab content:', contentId);
+      }
+    });
+  }
+  
+  // Make sure everything is initialized after DOM is fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded event fired, initializing FeaturesEditorSection');
+    init();
+  });
+  
+  // Initialize immediately as well (some Astro setups might not trigger DOMContentLoaded properly)
+  if (document.readyState !== 'loading') {
+    console.log('Document already loaded, initializing FeaturesEditorSection immediately');
+    init();
+  } else {
+    console.log('Document still loading, waiting for DOMContentLoaded event');
+  }
+</script>
+
