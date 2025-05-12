@@ -201,16 +201,26 @@ const AVAILABLE_ICONS = [
   
   // Setup all DOM elements after the page loads
   function setupDomElements() {
-    tabButtons = document.querySelectorAll('.tab-btn');
-    tabContents = document.querySelectorAll('.tab-content');
+    const sectionElement = document.getElementById(formState.id);
+    if (!sectionElement) {
+      console.error('[FeaturesEditorSection] Main section element not found with ID:', formState.id);
+      // Fallback to document query if sectionElement is not found
+      tabButtons = document.querySelectorAll('.tab-btn');
+      tabContents = document.querySelectorAll('.tab-content');
+    } else {
+      console.log('[FeaturesEditorSection] Scoping DOM queries to section:', sectionElement);
+      tabButtons = sectionElement.querySelectorAll('.tab-btn');
+      tabContents = sectionElement.querySelectorAll('.tab-content');
+    }
+
     taglineInput = document.getElementById('tagline-input');
     titleInput = document.getElementById('title-input');
     subtitleInput = document.getElementById('subtitle-input');
     featuresContainer = document.getElementById('features-container');
     addFeatureBtn = document.getElementById('add-feature-btn');
-    saveButton = document.getElementById('save-button');
+    saveButton = document.getElementById('save-button'); // ID was changed to 'save-button'
     
-    // Setup iconify
+    // Setup iconify (can remain global as it queries .icon globally)
     document.querySelectorAll('.icon').forEach(icon => {
       const iconName = icon.getAttribute('data-icon');
       if (iconName) {

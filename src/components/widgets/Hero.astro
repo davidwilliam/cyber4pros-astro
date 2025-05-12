@@ -68,7 +68,7 @@ const hasContent = subtitle || content || (actions && actions.length > 0) || ima
               )}
 
               {Array.isArray(actions) && actions.length > 0 && (
-                <div class="max-w-xs sm:max-w-md m-auto flex flex-nowrap flex-col sm:flex-row sm:justify-center gap-4 intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade">
+                <div class="mt-10 flex flex-wrap justify-center gap-4">
                   {actions.map((action, index) => (
                     <div class="flex w-full sm:w-auto">
                       <Button {...action} class="w-full sm:mb-0" />

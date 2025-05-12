@@ -222,6 +222,7 @@ const initialTab = 'title';
   let formState = { ...initialState };
   let activeTab = initialTab;
   let isUploading = false;
+  let hasInitialized = false; // Flag to ensure single initialization
   
   // DOM Elements
   let tabButtons, tabContents, taglineInput, titleEditor, subtitleInput, 
@@ -260,93 +261,101 @@ const initialTab = 'title';
   
   // Setup all DOM elements after the page loads
   function setupDomElements() {
-    tabButtons = document.querySelectorAll('.tab-btn');
-    tabContents = document.querySelectorAll('.tab-content');
-    taglineInput = document.getElementById('tagline-input');
-    titleEditor = document.getElementById('title-editor');
-    subtitleInput = document.getElementById('subtitle-input');
-    fileInput = document.getElementById('file-input');
-    uploadBtn = document.getElementById('upload-btn');
-    filenameDisplay = document.getElementById('filename-display');
-    imagePreview = document.getElementById('image-preview');
-    actionsContainer = document.getElementById('actions-container');
-    addActionBtn = document.getElementById('add-action-btn');
-    saveButton = document.getElementById('save-button');
+    const sectionElement = document.getElementById(formState.id);
+    if (!sectionElement) {
+      console.error('[HeroEditorSection] Main section element not found with ID:', formState.id);
+      // Fallback to document query if sectionElement is not found, though this is not ideal
+      tabButtons = document.querySelectorAll('.tab-btn');
+      tabContents = document.querySelectorAll('.tab-content');
+    } else {
+      console.log('[HeroEditorSection] Scoping DOM queries to section:', sectionElement);
+      tabButtons = sectionElement.querySelectorAll('.tab-btn');
+      tabContents = sectionElement.querySelectorAll('.tab-content');
+    }
+
+    taglineInput = document.getElementById('tagline-input'); // These are unique IDs, so global is fine
+    titleEditor = document.getElementById('title-editor');   // Unique ID
+    subtitleInput = document.getElementById('subtitle-input'); // Unique ID
+    fileInput = document.getElementById('file-input');         // Unique ID
+    uploadBtn = document.getElementById('upload-btn');         // Unique ID
+    filenameDisplay = document.getElementById('filename-display'); // Unique ID
+    imagePreview = document.getElementById('image-preview');   // Unique ID
+    actionsContainer = document.getElementById('actions-container'); // Unique ID
+    addActionBtn = document.getElementById('add-action-btn');   // Unique ID
+    saveButton = document.getElementById('save-button');       // Unique ID
   }
   
   // Initialize
   function init() {
-    console.log('Initializing HeroEditorSection with form state:', formState);
-    setupDomElements();
+    if (hasInitialized) {
+      console.log('[HeroEditorSection] Already initialized. Skipping further init calls.');
+      return;
+    }
+    console.log('[HeroEditorSection] Initializing HeroEditorSection with form state:', formState);
+    console.log('[HeroEditorSection] Initial activeTab before setActiveTab call:', activeTab);
+    setupDomElements(); // Assigns global saveButton, taglineInput, etc.
     
-    // Set active tab
     setActiveTab(activeTab);
     
-    // Add event listeners to tab buttons
     tabButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        setActiveTab(btn.dataset.tab);
-      });
+      btn.removeEventListener('click', setActiveTabFromButton);
+      btn.addEventListener('click', setActiveTabFromButton);
     });
     
     // Input fields for title tab
     if (taglineInput) {
-      taglineInput.addEventListener('input', (e) => {
-        formState.tagline = e.target.value;
-      });
+      taglineInput.removeEventListener('input', updateTaglineState);
+      taglineInput.addEventListener('input', updateTaglineState);
     } else {
-      console.warn('Tagline input not found');
+      console.warn('[HeroEditorSection] Tagline input not found');
     }
     
     if (titleEditor) {
-      titleEditor.addEventListener('input', () => {
-        formState.title = titleEditor.innerHTML;
-      });
-      
-      // Initialize title with HTML content
+      titleEditor.removeEventListener('input', updateTitleState);
+      titleEditor.addEventListener('input', updateTitleState);
       if (formState.title) {
         titleEditor.innerHTML = formState.title;
       }
-      
-      // Add highlight buttons
       addHighlightControls();
     } else {
-      console.warn('Title editor not found');
+      console.warn('[HeroEditorSection] Title editor not found');
     }
     
     if (subtitleInput) {
-      subtitleInput.addEventListener('input', (e) => {
-        formState.subtitle = e.target.value;
-      });
+      subtitleInput.removeEventListener('input', updateSubtitleState);
+      subtitleInput.addEventListener('input', updateSubtitleState);
     }
     
-    // File upload
+    // File upload listeners
     if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener('click', () => {
-        fileInput.click();
-      });
-      
-      fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          filenameDisplay.textContent = file.name;
-          handleFileUpload(file);
-        }
-      });
+      uploadBtn.removeEventListener('click', handleUploadBtnClick);
+      uploadBtn.addEventListener('click', handleUploadBtnClick);
+
+      fileInput.removeEventListener('change', handleFileInputChange);
+      fileInput.addEventListener('change', handleFileInputChange);
+    } else {
+      if (!uploadBtn) console.warn('[HeroEditorSection] Upload button (uploadBtn) not found in init');
+      if (!fileInput) console.warn('[HeroEditorSection] File input (fileInput) not found in init');
     }
     
     // Add action button
     if (addActionBtn) {
+      addActionBtn.removeEventListener('click', addAction);
       addActionBtn.addEventListener('click', addAction);
     }
     
     // Save button
-    if (saveButton) {
-      saveButton.addEventListener('click', handleSave);
+    if (saveButton) { 
+      console.log('[HeroEditorSection] Attaching click listener to saveButton:', saveButton);
+      saveButton.removeEventListener('click', handleSave);
+      saveButton.addEventListener('click', handleSave); 
+    } else {
+      console.warn('[HeroEditorSection] Save button (saveButton global) not found in init.');
     }
     
-    // Setup initial action event listeners
     setupActionEventListeners();
+    hasInitialized = true;
+    console.log('[HeroEditorSection] Initialization complete.');
   }
   
   // Add highlight controls to the title editor
@@ -392,6 +401,7 @@ const initialTab = 'title';
   
   // Set active tab
   function setActiveTab(tabId) {
+    console.log('[HeroEditorSection] setActiveTab called with:', tabId);
     activeTab = tabId;
     
     // Update tab button styles
@@ -408,8 +418,10 @@ const initialTab = 'title';
       const contentId = content.id;
       if (contentId === `${tabId}-tab`) {
         content.style.display = 'block';
+        console.log('[HeroEditorSection] Showing tab content:', contentId);
       } else {
         content.style.display = 'none';
+        console.log('[HeroEditorSection] Hiding tab content:', contentId);
       }
     });
   }
@@ -494,77 +506,70 @@ const initialTab = 'title';
     }
   }
   
-  // Handle saving
-  function handleSave() {
-    if (saveButton.disabled) return;
+  // Handle saving - direct async function
+  async function handleSave() { // Made this an async function directly
+    if (!saveButton || saveButton.disabled) { // Check module-scoped saveButton directly
+      console.log('[HeroEditorSection] Save operation skipped: button not found or disabled.', saveButton?.disabled);
+      return;
+    }
     saveButton.disabled = true;
     saveButton.textContent = 'Saving...';
     
-    // Direct implementation of save functionality without imports
-    (async function() {
-      try {
-        console.log('Saving section with ID:', formState.id);
-        
-        // Prepare data to send
-        const dataToSend = { 
-          tagline: formState.tagline, 
-          title: formState.title, 
-          subtitle: formState.subtitle,
-          actions: formState.actions.map(({ text, href, variant }) => ({
-            text, href, variant
-          }))
-        };
-        
-        // Ensure image object has correct structure
-        if (formState.image) {
-          if (typeof formState.image === 'string') {
-            dataToSend.image = { src: formState.image, alt: 'Hero image' };
-          } else if (typeof formState.image === 'object') {
-            dataToSend.image = { 
-              src: formState.image.src || '', 
-              alt: formState.image.alt || 'Hero image' 
-            };
-          }
-        } else {
-          dataToSend.image = { src: '', alt: '' };
+    try {
+      console.log('[HeroEditorSection] handleSave: Constructing dataToSend. Current formState.id:', formState.id);
+      
+      const dataToSend = {
+        tagline: formState.tagline || '',
+        title: formState.title || '',
+        subtitle: formState.subtitle || '',
+        actions: (formState.actions || []).map(({ text, href, variant }) => ({
+          text: text || '',
+          href: href || '',
+          variant: variant || 'primary'
+        })),
+        image: { 
+          src: (formState.image && formState.image.src) || '', 
+          alt: (formState.image && formState.image.alt) || 'Hero image' 
         }
-        
-        console.log('Section data being sent:', JSON.stringify(dataToSend, null, 2));
-        
-        const response = await fetch(`/api/sections/${formState.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dataToSend)
-        });
-        
-        // Handle unsuccessful responses first
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorMessage = 'Failed to save changes.';
-          
-          try {
-            const errorData = JSON.parse(errorText);
-            errorMessage = errorData.error || errorMessage;
-          } catch (parseError) {
-            console.error('Error parsing error response:', parseError);
-          }
-          
-          throw new Error(errorMessage);
-        }
-        
-        // Only try to parse success response here
-        const result = await response.json();
-        console.log('Section saved successfully:', result);
-        showToast('Changes saved successfully!', 'success');
-      } catch (err) {
-        console.error('Save error:', err);
-        // Don't show error toast since we're already displaying success
-      } finally {
-        // Re-enable the save button either way
-        saveButton.disabled = false;
-        saveButton.textContent = 'Save Changes';
+      };
+      if (!formState.image) {
+          dataToSend.image = { src: '', alt: 'Hero image' };
       }
-    })();
+      
+      console.log('[HeroEditorSection] Data to send:', JSON.stringify(dataToSend, null, 2));
+      
+      const response = await fetch(`/api/sections/${formState.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to save changes.';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          // console.error('Error parsing error response:', parseError);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      console.log('[HeroEditorSection] Save successful:', result);
+      showToast('Changes saved successfully!', 'success');
+      formState = { ...formState, ...dataToSend, id: formState.id }; // Update local state
+
+    } catch (err) {
+      console.error('[HeroEditorSection] Save error in handleSave:', err);
+      showToast(err.message || 'Failed to save changes', 'error');
+    } finally {
+      if (saveButton) {
+          saveButton.disabled = false;
+          saveButton.textContent = 'Save Changes';
+      }
+    }
   }
   
   // Add a new action
@@ -690,9 +695,58 @@ const initialTab = 'title';
     });
   }
   
+  // Define named event handlers for file input
+  function handleUploadBtnClick() {
+    console.log('[HeroEditorSection] Upload button clicked, triggering fileInput.click()');
+    if (fileInput) {
+      fileInput.value = null; 
+      fileInput.click();
+    } else {
+      console.warn('[HeroEditorSection] fileInput not found in handleUploadBtnClick');
+    }
+  }
+
+  function handleFileInputChange(e) {
+    console.log('[HeroEditorSection] fileInput change event triggered.');
+    const file = e.target.files[0];
+    if (file) {
+      console.log('[HeroEditorSection] File selected:', file.name);
+      if (filenameDisplay) filenameDisplay.textContent = file.name;
+      else console.warn('[HeroEditorSection] filenameDisplay not found in handleFileInputChange');
+      handleFileUpload(file);
+    } else {
+      console.log('[HeroEditorSection] No file selected or selection cancelled.');
+    }
+  }
+
+  // Need to define these new named handlers for inputs & tabs
+  function setActiveTabFromButton() { // `this` will be the button
+    setActiveTab(this.dataset.tab);
+  }
+
+  function updateTaglineState(e) {
+    formState.tagline = e.target.value;
+  }
+
+  function updateTitleState() { // For contenteditable
+    if (titleEditor) formState.title = titleEditor.innerHTML;
+  }
+
+  function updateSubtitleState(e) {
+    formState.subtitle = e.target.value;
+  }
+  
   // Make sure everything is initialized after DOM is fully loaded
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log('[HeroEditorSection] DOMContentLoaded event fired, calling init().');
+    init();
+  });
   
   // Initialize immediately as well (some Astro setups might not trigger DOMContentLoaded properly)
-  init();
+  if (document.readyState !== 'loading') {
+    console.log('[HeroEditorSection] Document already loaded, calling init() immediately.');
+    init();
+  } else {
+    console.log('[HeroEditorSection] Document still loading, waiting for DOMContentLoaded.');
+  }
 </script>
