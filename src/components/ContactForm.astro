@@ -1,82 +1,77 @@
 ---
 // src/components/ContactForm.astro
+// Plain JavaScript version with no TypeScript
+// @ts-nocheck
 
-import { showToast } from '~/utils/toast';
-
-export interface InputField {
-  label: string;
-  name: string;
-  type: 'text' | 'email' | 'password' | 'number' | 'tel' | 'url' | 'search' | 'date' | 'time' | 'datetime-local' | 'month' | 'week' | 'color' | 'checkbox' | 'radio' | 'textarea';
-  placeholder?: string;
-  value?: string;
-  required?: boolean;
-  rows?: number;
-}
-
-export interface ContactFormProps {
-  title: string;
-  inputs: InputField[];
-  textarea?: InputField;
-  disclaimer?: string;
-  button?: { label: string };
-  description?: string;
-  senderEmail: string;
-  recipient: string;
-}
-
+// Extract props with default values to prevent errors
 const {
-  title,
+  title = '',
   inputs = [],
-  textarea,
-  disclaimer,
-  button,
-  description,
-  senderEmail,
-  recipient
-} = Astro.props as ContactFormProps;
+  textarea = null,
+  disclaimer = '',
+  button = { label: 'Submit' },
+  description = '',
+  senderEmail = 'no-reply@datahubz.com', // Set default sender
+  recipient = 'contact@datahubz.com' // Default recipient, but will be overridden by API
+} = Astro.props;
 
-// Normalize label fields safely
-function getLabel(value: any): string {
-  return typeof value === 'string' ? value : value?.label || '';
+// Helper function for labels
+function getLabel(val) {
+  if (typeof val === 'string') return val;
+  return val && val.label ? val.label : '';
 }
 ---
 
 <div class="flex flex-col max-w-xl mx-auto rounded-lg backdrop-blur border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900 shadow p-4 sm:p-6 lg:p-8 w-full space-y-6">
   <form id="contact-form" class="space-y-4">
-    {inputs.map((input: InputField, index: number) => (
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          {getLabel(input.label)}
-        </label>
-        {input.type === 'textarea' ? (
-          <textarea
-            name={input.name}
-            class="w-full border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-slate-800"
-            rows={4}
-          ></textarea>
-        ) : (
-          <input
-            type={input.type as "text" | "email" | "password" | "number" | "tel" | "url" | "search" | "date" | "time" | "datetime-local" | "month" | "week" | "color" | "checkbox" | "radio"}
-            name={input.name}
-            class="w-full border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-slate-800"
-            value={input.value || ''}
-            placeholder={input.placeholder}
-            required={input.required}
-          />
-        )}
-      </div>
-    ))}
+    {inputs.map((input) => {
+      const inputName = input.name || '';
+      const inputLabel = getLabel(input.label);
+      const inputType = input.type || 'text';
+      const inputPlaceholder = input.placeholder || '';
+      const inputRows = input.rows || 4;
+      const inputRequired = !!input.required;
+      
+      return (
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for={inputName}>
+            {inputLabel}
+          </label>
+          {inputType === 'textarea' ? (
+            <textarea
+              id={inputName}
+              name={inputName}
+              class="w-full border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-slate-800"
+              rows={inputRows}
+              placeholder={inputPlaceholder}
+              required={inputRequired}
+            ></textarea>
+          ) : (
+            <input
+              id={inputName}
+              type={inputType}
+              name={inputName}
+              class="w-full border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-slate-800"
+              placeholder={inputPlaceholder}
+              required={inputRequired}
+            />
+          )}
+        </div>
+      );
+    })}
 
     {textarea && (
       <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for={textarea.name || ''}>
           {getLabel(textarea.label)}
         </label>
         <textarea
-          name={textarea.name}
+          id={textarea.name || ''}
+          name={textarea.name || ''}
           class="w-full border border-gray-300 dark:border-gray-600 rounded p-2 bg-white dark:bg-slate-800"
           rows={textarea.rows || 6}
-          placeholder={textarea.placeholder}
+          placeholder={textarea.placeholder || ''}
+          required={!!textarea.required}
         ></textarea>
       </div>
     )}
@@ -86,11 +81,17 @@ function getLabel(value: any): string {
         <input
           type="checkbox"
           name="disclaimer"
+          id="disclaimer"
           class="mt-1 border border-gray-300 dark:border-gray-600 rounded"
+          required
         />
         <span>{getLabel(disclaimer)}</span>
       </label>
     )}
+
+    <!-- Hidden fields for form data -->
+    <input type="hidden" id="formTitle" value={title} />
+    <input type="hidden" id="senderEmail" value={senderEmail} />
 
     <button
       type="submit"
@@ -106,90 +107,132 @@ function getLabel(value: any): string {
       </p>
     )}
   </form>
+
+  <div id="form-message" class="hidden text-center py-2 px-4 rounded"></div>
 </div>
 
-<script define:vars={{ title, senderEmail, recipient, getLabel }}>
-  document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('contact-form');
-    const submitBtn = document.getElementById('submit-btn');
+<script is:inline>
+  // Wait for DOM to be fully loaded
+  document.addEventListener('DOMContentLoaded', function() {
+    // Get form element
+    var form = document.getElementById('contact-form');
+    if (!form) return;
     
-    if (!form || !submitBtn) return;
-    
-    const formData = {};
-    
-    // Add input change handlers
-    form.querySelectorAll('input, textarea').forEach(input => {
-      input.addEventListener('change', (e) => {
-        const { name, value, type, checked } = e.target;
-        formData[name] = type === 'checkbox' ? checked : value;
-      });
-    });
-    
-    form.addEventListener('submit', async (e) => {
+    // Get message display element
+    var messageEl = document.getElementById('form-message');
+
+    // Show message function
+    function showMessage(message, isError) {
+      if (!messageEl) return;
+      
+      messageEl.textContent = message;
+      messageEl.classList.remove('hidden', 'bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800');
+      
+      if (isError) {
+        messageEl.classList.add('bg-red-100', 'text-red-800');
+      } else {
+        messageEl.classList.add('bg-green-100', 'text-green-800');
+      }
+      
+      // Hide message after 5 seconds
+      setTimeout(function() {
+        messageEl.classList.add('hidden');
+      }, 5000);
+    }
+
+    // Form submit handler
+    form.addEventListener('submit', function(e) {
       e.preventDefault();
       
+      // Get submit button
+      var submitBtn = document.getElementById('submit-btn');
       if (!submitBtn) return;
       
+      // Get hidden fields with fallbacks
+      var formTitleEl = document.getElementById('formTitle');
+      var senderEmailEl = document.getElementById('senderEmail');
+      
+      var formTitle = formTitleEl && formTitleEl.value ? formTitleEl.value : '';
+      var senderEmail = senderEmailEl && senderEmailEl.value ? senderEmailEl.value : '';
+      
+      // Disable submit button
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting...';
+
+      // Collect form fields
+      var formFields = [];
       
-      try {
-        // Gather form data
-        const formElements = form.elements;
-        const fields = [];
+      // Get all visible inputs and textareas
+      var inputs = form.querySelectorAll('input:not([type="hidden"]):not([type="submit"])');
+      var textareas = form.querySelectorAll('textarea');
+      
+      // Process inputs
+      for (var i = 0; i < inputs.length; i++) {
+        var input = inputs[i];
+        if (!input.name) continue;
         
-        // Process all form fields
-        for (let i = 0; i < formElements.length; i++) {
-          const element = formElements[i];
-          
-          // Skip buttons and elements without a name
-          if (element.type === 'submit' || !element.name) continue;
-          
-          // Handle checkboxes differently
-          const value = element.type === 'checkbox' ? element.checked : element.value;
-          
-          fields.push({
-            label: element.name,
-            value: value
-          });
-        }
-        
-        const response = await fetch('/api/contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subject: 'Form Submission',
-            formTitle: title,
-            senderEmail,
-            recipient,
-            fields
-          })
+        var value = input.type === 'checkbox' ? input.checked : input.value;
+        formFields.push({
+          label: input.name,
+          value: value
         });
+      }
+      
+      // Process textareas
+      for (var j = 0; j < textareas.length; j++) {
+        var textarea = textareas[j];
+        if (!textarea.name) continue;
         
-        const result = await response.json();
-        
-        if (response.ok) {
-          // Success
-          import('~/utils/toast').then(({ showToast }) => {
-            showToast('Form submitted successfully!', 'success');
-          });
+        formFields.push({
+          label: textarea.name,
+          value: textarea.value
+        });
+      }
+
+      // Find email field for sender's email as reply-to
+      var emailInput = Array.from(inputs).find(function(input) {
+        return input.type === 'email' || input.name.toLowerCase().includes('email');
+      });
+      var userEmail = emailInput ? emailInput.value : '';
+      
+      // Send data to server
+      fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          subject: 'Form Submission',
+          formTitle: formTitle,
+          senderEmail: senderEmail,
+          // Include user's email as reply-to if available
+          replyToEmail: userEmail || undefined,
+          fields: formFields
+        })
+      })
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        if (data && data.message) {
+          showMessage('Form submitted successfully!', false);
           form.reset();
         } else {
-          // Error from server
-          import('~/utils/toast').then(({ showToast }) => {
-            showToast(result.error || 'An error occurred', 'error');
-          });
+          var errorMsg = data && data.error ? data.error : 'An error occurred';
+          showMessage(errorMsg, true);
         }
-      } catch (err) {
-        // Network or other error
-        import('~/utils/toast').then(({ showToast }) => {
-          showToast('An error occurred', 'error');
-        });
-      } finally {
-        // Re-enable button
-        submitBtn.disabled = false;
-        submitBtn.textContent = getLabel(button?.label || 'Submit');
-      }
+      })
+      .catch(function(error) {
+        console.error('Error:', error);
+        showMessage('An error occurred while submitting the form', true);
+      })
+      .finally(function() {
+        // Re-enable submit button
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit';
+        }
+      });
     });
   });
 </script>
